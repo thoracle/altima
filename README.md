@@ -27,8 +27,12 @@ thy progress.
 
 ## Features
 
-- Procedural overworld (fixed seed) with towns, castle, dungeons, shrines,
-  moongates, and ship-only islands
+- Procedural overworld (fixed seed) with six towns, a castle, dungeons,
+  shrines, and ship-only islands
+- Eight moongates ruled by two moons, Ultima-style: Trammel's phase opens
+  a gate, Felucca's phase chooses where it leads
+- Original chiptune score — overworld, town, dungeon, and sea themes
+  (V toggles music)
 - Keyword-based NPC dialogue (type NAME, JOB, MANTRA, ...)
 - Roguelike bump combat everywhere: overworld, 5-level dungeons, and a
   dozen raid scenarios (pirate sieges, undead moongate incursions, shrine
@@ -57,5 +61,6 @@ thy progress.
 | B / X | board or cross ships / go ashore |
 | H | camp |
 | Z | stats & proven mantras |
+| V | toggle music |
 | Shift+S | save |
 | ? | help |

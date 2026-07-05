@@ -129,6 +129,68 @@ const sfx={
 };
 
 //---------------------------------------------------------------
+// 1b. Music — a tiny two-voice chiptune sequencer, U4 spirit
+//---------------------------------------------------------------
+const TUNES={
+  world:{bpm:96,   // "The Wanderer's Road" — D dorian
+    mel:[[62,1],[65,1],[69,1],[67,.5],[65,.5],[67,1.5],[0,.5],[65,1],[62,1],[60,1],[57,1],[62,2],[0,1],
+         [69,1],[72,1],[74,1],[72,.5],[69,.5],[70,1.5],[0,.5],[69,1],[67,1],[65,1],[67,1],[62,2],[0,2]],
+    bass:[[38,2],[45,2],[41,2],[43,2],[38,2],[45,2],[36,2],[38,2]]},
+  town:{bpm:132,   // "Hearth and Market" — G major lilt
+    mel:[[67,.5],[71,.5],[74,.5],[72,.5],[71,.5],[67,.5],[69,1],[71,.5],[72,.5],[74,.5],[76,.5],[74,.5],[71,.5],[72,1],[0,.5],
+         [74,.5],[76,.5],[74,.5],[72,.5],[71,.5],[69,.5],[67,.5],[64,.5],[67,1.5],[0,.5]],
+    bass:[[43,1],[47,1],[48,1],[50,1],[43,1],[40,1],[45,1],[47,1]]},
+  dungeon:{bpm:60, // "The Deep Dark" — E phrygian, sparse
+    mel:[[52,2],[53,2],[52,2],[48,3],[0,1],[55,2],[56,2],[55,2],[52,3],[0,1]],
+    bass:[[28,4],[29,4],[28,4],[24,4]]},
+  dirge:{bpm:50,   // "The Clerics' Lament" — for the fallen
+    mel:[[69,2],[67,2],[65,2],[64,3],[0,1],[65,2],[64,2],[62,2],[60,3],[0,1],[57,4],[0,2]],
+    bass:[[45,4],[41,4],[40,4],[33,4]]},
+  sea:{bpm:104,    // "Under Dead Wind" — A minor, rolling
+    mel:[[57,.75],[60,.75],[64,.75],[65,.75],[64,.75],[60,.75],[62,.75],[59,.75],[60,.75],[57,.75],[55,1.5],[0,.75],
+         [64,.75],[67,.75],[71,.75],[69,.75],[67,.75],[64,.75],[65,.75],[62,.75],[64,1.5],[0,.75]],
+    bass:[[33,1.5],[40,1.5],[38,1.5],[36,1.5],[33,1.5],[29,1.5],[31,1.5],[33,1.5]]},
+};
+const MUS={on: localStorage.getItem("altima-music")!=="off", tune:null, mi:0, bi:0, mNext:0, bNext:0, timer:null};
+const mf=n=> n? 440*Math.pow(2,(n-69)/12) : 0;
+function mNote(freq,t,dur,type,vol){
+  if(!freq) return;
+  const o=AC.createOscillator(), g=AC.createGain();
+  o.type=type; o.frequency.value=freq;
+  g.gain.setValueAtTime(0,t);
+  g.gain.linearRampToValueAtTime(vol,t+.02);
+  g.gain.setValueAtTime(vol,t+Math.max(.03,dur*.7));
+  g.gain.linearRampToValueAtTime(.0001,t+dur*.95);
+  o.connect(g); g.connect(AC.destination);
+  o.start(t); o.stop(t+dur);
+}
+function musicPump(){
+  if(!MUS.on || !AC || !MUS.tune) return;
+  try{
+    const T=TUNES[MUS.tune], spb=60/T.bpm, edge=AC.currentTime+.5;
+    if(MUS.mNext<AC.currentTime) MUS.mNext=AC.currentTime+.05;
+    if(MUS.bNext<AC.currentTime) MUS.bNext=AC.currentTime+.05;
+    while(MUS.mNext<edge){ const[n,d]=T.mel[MUS.mi++%T.mel.length];  mNote(mf(n),MUS.mNext,d*spb,"square",.02);   MUS.mNext+=d*spb; }
+    while(MUS.bNext<edge){ const[n,d]=T.bass[MUS.bi++%T.bass.length]; mNote(mf(n),MUS.bNext,d*spb,"triangle",.022); MUS.bNext+=d*spb; }
+  }catch(e){}
+}
+function updateTune(){
+  const name = mode==="dead"? "dirge"
+    : inDun? "dungeon" : inLoc? "town" : (P&&P.onShip)? "sea" : "world";
+  if(MUS.tune===name) return;
+  MUS.tune=name; MUS.mi=0; MUS.bi=0;
+  if(AC){ MUS.mNext=AC.currentTime+.15; MUS.bNext=AC.currentTime+.15; }
+}
+function ensureMusic(){
+  try{
+    AC = AC || new (window.AudioContext||window.webkitAudioContext)();
+    if(AC.resume) AC.resume();
+    if(!MUS.timer) MUS.timer=setInterval(musicPump,150);
+    updateTune();
+  }catch(e){}
+}
+
+//---------------------------------------------------------------
 // 2. Sprites — 8x8 pixel art, palette-mapped, scaled 4x
 //---------------------------------------------------------------
 const TILE=32, VIEW=13, HALF=6;
@@ -383,9 +445,9 @@ let CASTLE={x:0,y:0};{
     if(d<best){best=d;CASTLE={x,y};}
   }
 }
-const TOWNS   = landSpots(2,18,[CASTLE]);
+const TOWNS   = landSpots(5,14,[CASTLE]);
 const SHRINES = landSpots(8,11,[CASTLE,...TOWNS]);
-const GATES   = landSpots(3,22,[CASTLE,...TOWNS,...SHRINES]);
+const GATES   = landSpots(8,12,[CASTLE,...TOWNS,...SHRINES]);
 const VIRTUES = ["Honesty","Compassion","Valor","Justice","Sacrifice","Honor","Spirituality","Humility"];
 const MANTRAS = ["AHT","MIR","KOR","LEX","DON","SUL","OM","MEK"];
 
@@ -539,8 +601,10 @@ castle:{
    "4":{name:"Mirren the Seer",spr:"mage",peace:true,
      greet:"A robed seer studies a glowing orb.",
      lines:{ job:"I read the moons and the gates they open.",
-       moon:"Three moongates stand in the wild. As the moons turn, one doorway of light rises from the earth — step through and be carried to the next.",
-       gate:"The blue doors rise and sink with the moons. Watch the MOONS panel.",
+       moon:"Two moons rule the eight gates: TRAMMEL raises one doorway of light as she turns, and FELUCCA chooses where it carries thee. Watch them both.",
+       gate:"Eight blue doors stand in the wild. Trammel opens; Felucca aims. When the moons agree, the gate leads nowhere at all.",
+       trammel:"The slow moon. Her phase decides WHICH gate stands open.",
+       felucca:"The swift moon. Her phase decides WHERE the open gate leads.",
        curse:"When the moons darken, a gate sticks open and burns red — and the dead walk out of it. Someone must go IN.",
        dead:"Bone and shade serve the Barrow King beyond the corrupted gate. Steel and spirit send them back.",
        barrow:"The Silver Barrow was sealed before the castle's first stone. The Barrow King took its key into death with him.",
@@ -756,6 +820,160 @@ town2:{
        whirl:"Hit the whirlpool once. Woke up half the sea away with me hat gone.",
        hull:"A moored ship mends herself slow. Or pay me and sail NOW." }},
   }},
+willowdale:{
+  name:"Willowdale",
+  map:padMap([
+  "ggggggggggggggggg",
+  "g#######,#######g",
+  "g#.....#,#.....#g",
+  "g#..1..D,D..2..#g",
+  "g#.....#,#.....#g",
+  "g###D###,###D###g",
+  "g,,,,,,,,,~~,,,,g",
+  "g@,,,,,,3,~~,,,,g",
+  "g###D###,###D###g",
+  "g#.....#,#.....#g",
+  "g#..4..#,#..5..#g",
+  "g#.....#,#.....#g",
+  "g#######,#######g",
+  "ggggggggggggggggg",
+  ]),
+  npcs:{
+   "1":{name:"Herb-wife Etta",spr:"healer",peace:true,
+     greet:"Bundles of drying herbs hang from every beam.",
+     lines:{ job:"Herbs and remedies. Say BUY for provisions, or CURE (10g) for venom.",
+       buy:{shop:"food"},
+       cure:()=>{ if(!P.poison) return msg('"No venom in thee, dear."',"m-sys");
+         if(P.gold<10) return msg('"Ten gold, dear. Herbs don\'t grow free."',"m-sys");
+         P.gold-=10; P.poison=false; msg("A bitter draught, and the venom is gone.","m-good"); },
+       herb:"Nightshade for poison, willowbark for pain. The swamps would kill less if folk carried herbs." }},
+   "2":{name:"Shepherd Col",spr:"beggar",peace:true,
+     greet:"A shepherd leans on his crook, chewing a straw.",
+     lines:{ job:"Sheep. That's it. That's the job.",
+       mantra:"Humility? MEK, they say. Sheep taught me all of it I know.",
+       sheep:"Baa.",
+       wisdom:"The lowest hill still looks down on the valley. Think on that. Or don't." }},
+   "3":{name:"Hermit Dain",spr:"mage",peace:true,
+     greet:"A hermit sits cross-legged by the pond, eyes closed.",
+     lines:{ job:"I listen to the water. It has opinions.",
+       moon:"Two moons, eight doors. Trammel opens, Felucca sends. The water showed me once.",
+       relic:"The old magic sleeps in things now, not words. Deep places. Drowned places. Dead places.",
+       mantra:"OM binds the seven. Breathe it slow.",
+       pond:"The pond? Older than the town. Possibly wiser." }},
+   "4":{name:"Miller Bess",spr:"merchant",peace:true,
+     greet:"Flour dusts everything, including thee, immediately.",
+     lines:{ job:"I grind the valley's grain. Fresh bread on market days!",
+       rumor:"A pale ship rides the night fog, they say. Sailors who board her don't always come back. And some come back RICH.",
+       bread:"Take a loaf, traveler — no, I jest. Say BUY to Etta, she handles coin." }},
+   "5":{name:"Warden Puck",spr:"guard",peace:true,
+     greet:"A young warden polishes a spear taller than himself.",
+     lines:{ job:"I ward Willowdale! Mostly from wolves. Sometimes from geese.",
+       swamp:"Mind the marshes east — vipers, and worse. Basilisks come up from the deep dungeons now.",
+       monster:"Wraiths and demons in the dungeon depths, the miners say. I stay up here. With the geese." }},
+  }},
+goldport:{
+  name:"Goldport",
+  map:padMap([
+  "ggggggggggggggggg",
+  "g#######,#######g",
+  "g#..C..#,#..C..#g",
+  "g#..1..D,D..2..#g",
+  "g#.....#,#.....#g",
+  "g###D###,###D###g",
+  "g,,,,,,,,,,,,,,,g",
+  "g@,,,,,,3,,,,,,,g",
+  "g###D###,###D###g",
+  "g#.....#,#.....#g",
+  "g#..4..#,#..5..#g",
+  "g#.....#,#.....#g",
+  "g#######,#######g",
+  "ggggggggggggggggg",
+  ]),
+  npcs:{
+   "1":{name:"Shipwright Hale",spr:"guard",peace:true,
+     greet:"Sawdust and tar — a shipwright looks up from her bench.",
+     lines:{ job:"Hulls mended proper. Say REPAIR — thirty gold patches thy whole fleet.",
+       repair:()=>{
+         if(!ships.length) return msg('"Buy a ship first, landwalker."',"m-sys");
+         if(ships.every(s=>s.hull>=s.maxhull)) return msg('"Sound as the day she was laid. Off with thee."',"m-sys");
+         if(P.gold<30) return msg('"Thirty gold. Wood isn\'t free."',"m-sys");
+         P.gold-=30; ships.forEach(s=>s.hull=s.maxhull);
+         msg("Hale patches thy fleet good as new.","m-good"); sfx.gold();
+       },
+       ghost:"The pale ship? Seen her twice. Her timbers take half the blow they should. Unnatural. Beautiful work, though." }},
+   "2":{name:"Trader Ives",spr:"merchant",peace:true,
+     greet:"A trader spreads his wares with a flourish.",
+     lines:{ job:"Arms and steel, fair prices! Say BUY.",
+       buy:{shop:"weapons"},
+       fence:"Skullhaven sells cheaper, aye. Ask thy conscience what the discount costs." }},
+   "3":{name:"Dockmaster Rena",spr:"guard",peace:true,
+     greet:"The dockmaster checks her ledger without looking up.",
+     lines:{ job:"Every hull in and out of Goldport passes my ledger.",
+       ship:"Sink a pirate gentle and her crew strikes colors — free ship. My ledger disapproves. I don't.",
+       whirl:"The whirlpool took two barges last season. She spits ships out where she pleases.",
+       sextant:"A drowned captain still carries the finest sextant ever made. So the drunk sailors say.",
+       mantra:"Honesty is AHT. In this trade, it's also survival." }},
+   "4":{name:"Chandler Wick",spr:"merchant",peace:true,
+     greet:"Candles, rope, biscuit — a chandler's clutter.",
+     lines:{ job:"Provisions for the sea! Say BUY.",
+       buy:{shop:"food"} }},
+   "5":{name:"Old Nan",spr:"beggar",peace:true,
+     greet:"An old woman knits by the door, watching everything.",
+     lines:{ job:"I knit. I watch. I remember.",
+       rumor:"The moons have been strange lately. When the red door opens, child, don't walk in unarmed.",
+       honesty:"Kept an honest ledger forty years. The rune of it sits under the bard's feet in Moonhaven, they say." }},
+  }},
+stonevale:{
+  name:"Stonevale",
+  map:padMap([
+  "ggggggggggggggggg",
+  "g#######,#######g",
+  "g#.....#,#.....#g",
+  "g#..1..D,D..2..#g",
+  "g#..C..#,#.....#g",
+  "g###D###,###D###g",
+  "g,,,,,,,,,,,,,,,g",
+  "g@,,,,,,3,,,,,,,g",
+  "g###D###,###D###g",
+  "g#.....#,#.....#g",
+  "g#..4..#,#..5..#g",
+  "g#.....#,#.....#g",
+  "g#######,#######g",
+  "ggggggggggggggggg",
+  ]),
+  npcs:{
+   "1":{name:"Foreman Brakk",spr:"merchant",peace:true,
+     greet:"A broad foreman wipes stone dust from his hands.",
+     lines:{ job:"Stonevale armors half the realm. Say BUY.",
+       buy:{shop:"armor"} }},
+   "2":{name:"Priestess Iva",spr:"healer",peace:true,
+     greet:"A priestess tends a small stone altar.",
+     lines:{ job:"I mend miners. Say HEAL — twenty-five gold.",
+       heal:()=>{ if(P.gold<25) return msg('"Twenty-five gold, child."',"m-sys");
+         P.gold-=25; P.hp=P.maxhp; msg("Stone-cool hands, and thy wounds close.","m-good"); sfx.virtue(); },
+       mantra:"Sacrifice is DON. Every miner's widow knows that one.",
+       altar:"We pray for the ones the deep keeps." }},
+   "3":{name:"Deep-miner Oth",spr:"pirate",peace:true,
+     greet:"A soot-eyed miner stares at nothing in particular.",
+     lines:{ job:"I dig. I dug too deep once. Once.",
+       deep:"Below the third floor the air goes WRONG. Wraiths. Basilisks. On the fifth... things with horns.",
+       relic:"The old-magic trinkets? Bottom floors. Every pit has one. Guarded, always guarded.",
+       dungeon:"Gloom, Vex, Maw, Hollow — and the isle-pits, Gilt and Wrack. Five floors each now. FIVE.",
+       varkul:"Heard the dragon's dead. Good. His lair had the only gold I never wanted." }},
+   "4":{name:"Smelter Guss",spr:"merchant",peace:true,
+     greet:"The smelter's face glows orange by the furnace light.",
+     lines:{ job:"I melt what Brakk sells. Circle of life.",
+       dragonscale:"Dragonscale can't be forged, only taken. Whoever skinned VARKUL wears the best armor in the world.",
+       moonblade:"A silver blade that sings? Barrow-work. Older than any forge here." }},
+   "5":{name:"Widow Marn",spr:"beggar",peace:true,
+     greet:"A widow in grey sweeps a doorstep that is already clean.",
+     lines:{ job:"I keep house for the ones who don't come up.",
+       mantra:"Compassion is MIR. Learned it the hard way.",
+       give:()=>{ if(P.gold<1) return msg("Thou hast nothing to give.","m-sys");
+         const amt=Math.min(P.gold,ri(2,5)); P.gold-=amt;
+         if(P.marnT===undefined || turns-P.marnT>=100){ P.marnT=turns; virtue(1,3,`Widow Marn accepts ${amt} gold with quiet grace.`); }
+         else msg(`Widow Marn thanks thee for ${amt} gold.`,"m-say"); } }},
+  }},
 cellar:{
   name:"Marla's Cellar",
   map:padMap([
@@ -882,8 +1100,8 @@ void:{
   ]),
   npcs:{}},
 };
-// map town index to LOC key
-const TOWN_KEYS=["town0","town1","town2"];
+// map town index to LOC key (indexes 0-4 mainland, 5 = the pirate isle)
+const TOWN_KEYS=["town0","town1","willowdale","goldport","stonevale","town2"];
 
 // the Seer reads each virtue by name
 {
@@ -1257,7 +1475,10 @@ function tileAt(x,y){
   return gw(x,y);
 }
 function isNight(){ const d=turns%400; return d>=280; }
-function moonPhase(){ return Math.floor(turns/28)%GATES.length; }
+// two moons: Trammel opens the gates, Felucca chooses where they lead
+function trammel(){ return Math.floor(turns/24)%GATES.length; }
+function felucca(){ return Math.floor(turns/8)%GATES.length; }
+function moonPhase(){ return trammel(); }
 
 function render(){
   cx.fillStyle="#000"; cx.fillRect(0,0,cv.width,cv.height);
@@ -1276,10 +1497,10 @@ function render(){
   };
   if(!inLoc){
     if(!inDun){
-      const g=GATES[moonPhase()];
+      const g=GATES[trammel()];
       if(g){
-        // the doorway rises, stands, then sinks with the moon's passage
-        const p=(turns%28)/28;
+        // the doorway rises, stands, then sinks with Trammel's passage
+        const p=(turns%24)/24;
         const stage = p<.12?0 : p<.25?1 : p<.75?2 : p<.88?1 : 0;
         draw(`gate${stage}f${animF}`,g.x,g.y);
       }
@@ -1313,14 +1534,14 @@ function render(){
     cx.fillStyle=grad; cx.fillRect(0,0,cv.width,cv.height);
   }
   renderStats();
+  updateTune();
 }
 
 const statsEl=$("stats");
 function renderStats(){
   if(!P) return;
   const w=WEAPONS[P.weapon], a=ARMORS[P.armor];
-  const phase=moonPhase();
-  const moons="●◐○".split("");
+  const MOONG=["🌑","🌒","🌓","🌔","🌕","🌖","🌗","🌘"];
   let html=`<h3>THE STRANGER${P.avatar?" ✦SAINT✦":""}</h3>`;
   if(P.finalSiege && !P.finalDone) html+=`<div class="srow"><b style="color:var(--red)">⚔ CASTLE LUMEN BESIEGED!</b></div>`;
   else if(P.siege) html+=`<div class="srow"><b style="color:var(--red)">${P.siege.fire?"🔥":"⚔"} ${LOCS[TOWN_KEYS[P.siege.town]].name} ${P.siege.fire?"burns":"besieged"}!</b></div>`;
@@ -1345,7 +1566,7 @@ function renderStats(){
   const nr=Object.values(P.relics).filter(Boolean).length;
   if(nr) html+=`<div class="srow"><span>Relics</span><b style="color:var(--blue)">${nr}/9</b></div>`;
   if(P.silverKey) html+=`<div class="srow"><span>Key</span><b style="color:#cfd8e8">Silver</b></div>`;
-  html+=`<div class="srow"><span>Moons</span><b>${moons[phase%3]} gate ${phase+1}</b></div>`;
+  html+=`<div class="srow"><span>Moons</span><b>${MOONG[trammel()]}${MOONG[felucca()]} ${trammel()+1}→${felucca()+1}</b></div>`;
   html+=`<div class="srow"><span>Time</span><b>${inDun?"dark":"" || (isNight()?"night":"day")} · t${turns}</b></div>`;
   html+=`<div class="srow"><span>Place</span><b>${
     inDun? `${DUNGEONS[inDun.idx].name} L${inDun.lvl+1}` : inLoc? LOCS[inLoc.key].name : "Albion"}</b></div>`;
@@ -1467,9 +1688,13 @@ function shrineVirtue(x,y){ const i=shrineIndex(x,y); return i>=0?VIRTUES[i]:"?"
 
 function enterGate(){
   sfx.gate();
-  const next=GATES[(moonPhase()+1)%GATES.length];
-  P.x=next.x; P.y=next.y;
-  msg("Blue fire swallows thee — a moongate! Thou art elsewhere.","m-blue");
+  const dest=GATES[felucca()];
+  if(dest.x===P.x && dest.y===P.y){
+    msg("The gate flickers — and returns thee whence thou stood. Felucca is unkind.","m-blue");
+    return;
+  }
+  P.x=dest.x; P.y=dest.y;
+  msg("Blue fire swallows thee — Felucca carries thee elsewhere!","m-blue");
 }
 
 function virtueAvg(){ return P.virtues.reduce((a,b)=>a+b,0)/8; }
@@ -2178,6 +2403,7 @@ function playerDeath(){
   }
   sfx.die();
   mode="dead";
+  updateTune();
   showOverlay("THOU ART SLAIN",
     `Darkness takes thee...<br><br>But Lord Lumen's clerics drag thy body from the field.
      Thou awakenest at Castle Lumen, lighter of purse and pride.`,
@@ -2255,7 +2481,7 @@ function tick(){
   // the dragon burns a town
   if(!inLoc && !inDun && P.dragonAwake && !P.dragonSlain && !P.siege
      && turns-(P.lastSiege||0)>500 && R()<1/250){
-    P.siege={town:ri(0,1), fire:true, since:turns};
+    P.siege={town:ri(0,4), fire:true, since:turns};
     msg(`VARKUL descends upon ${LOCS[TOWN_KEYS[P.siege.town]].name} — the town BURNS!`,"m-bad");
     sfx.die();
   }
@@ -2313,7 +2539,7 @@ function tick(){
   // pirates strike at the mainland
   if(!inLoc && !inDun && !P.siege && !P.finalSiege && !P.finalDone
      && turns>400 && turns-(P.lastSiege||0)>600 && R()<1/300){
-    P.siege={town:ri(0,1), since:turns};
+    P.siege={town:ri(0,4), since:turns};
     msg(`Word travels fast: pirate reavers besiege ${LOCS[TOWN_KEYS[P.siege.town]].name}!`,"m-bad");
     msg("(Go to its gate and press E to fight for the town.)","m-sys");
     sfx.hurt();
@@ -2663,7 +2889,7 @@ function load(){
     const cleanRelics=o=>(o&&typeof o==="object")
       ? Object.fromEntries(Object.keys(RELICS).filter(k=>o[k]).map(k=>[k,true])) : {};
     P.relics=cleanRelics(P.relics); P.relicsFound=cleanRelics(P.relicsFound);
-    if(P.siege && !(Number.isInteger(P.siege.town)&&P.siege.town>=0&&P.siege.town<=1)) P.siege=null;
+    if(P.siege && !(Number.isInteger(P.siege.town)&&P.siege.town>=0&&P.siege.town<=4)) P.siege=null;
     if(P.moonCurse && !(Number.isInteger(P.moonCurse.gate)&&GATES[P.moonCurse.gate])) P.moonCurse=null;
     if(P.desec && !(Number.isInteger(P.desec.v)&&P.desec.v>=0&&P.desec.v<8)) P.desec=null;
     if(P.plot && !Array.isArray(P.plot.traitors)) P.plot=null;
@@ -2696,6 +2922,7 @@ function load(){
 const KEYDIR={ArrowUp:"up",ArrowDown:"down",ArrowLeft:"left",ArrowRight:"right",
               w:"up",s:"down",a:"left",d:"right",W:"up",S:"down",A:"left",D:"right"};
 document.addEventListener("keydown",e=>{
+  ensureMusic();
   if(mode==="text") return; // input has focus
   if(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"," "].includes(e.key)) e.preventDefault();
 
@@ -2748,6 +2975,11 @@ document.addEventListener("keydown",e=>{
     case "x": cmdExitShip(); break;
     case "h": cmdCamp(); break;
     case "z": cmdZtats(); break;
+    case "v":
+      MUS.on=!MUS.on;
+      localStorage.setItem("altima-music",MUS.on?"on":"off");
+      msg(MUS.on?"The minstrels play on.":"The minstrels fall silent.","m-sys");
+      break;
     case "?": case "/":
       mode="help";
       showOverlay("COMMANDS",
