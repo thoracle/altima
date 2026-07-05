@@ -34,7 +34,12 @@ thy progress.
 - Original chiptune score — eight themes: overworld, town, castle,
   dungeon, sea, shrine hymn, battle, and a death dirge
   (V toggles music)
-- Keyword-based NPC dialogue (type NAME, JOB, MANTRA, ...)
+- Living towns: every villager keeps a daily agenda — working by day,
+  drinking in the tavern by evening, asleep in a real bed at night
+  (shops keep hours; guards, healers, and pirates never rest)
+- Topic-menu dialogue (pick a number) layered over free keyword typing —
+  secrets still hide behind unlisted words, and the folk greet a
+  Paragon differently than a Stranger
 - Roguelike bump combat everywhere: overworld, 5-level dungeons, and a
   dozen raid scenarios (pirate sieges, undead moongate incursions, shrine
   desecrations, a dragon that burns towns, a deck fight for a ghost ship,

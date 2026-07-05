@@ -317,6 +317,8 @@ rider :{px:["...hh...","..bbb...",".mmmmmmM",".mmmmmm.",".m.mm.m.",".m.mm.m.",".
         pal:{".":null,"h":"#f2c896","b":"#6fa8ff","m":"#7a4e22","M":"#9a6e3a"}},
 basilisk:{px:["........","g.....g.",".gggggg.","geegggg.",".gggggg.","..gggg..",".g.g.g.g","........"],
         pal:{".":null,"g":"#a8c83a","e":"#ff4a4a"}},
+bed   :{px:["........",".BBBBBB.",".BppllB.",".BppllB.",".BBBBBB.","........","........","........"],
+        pal:{".":"#8a8296","B":"#6b3f1c","p":"#e8e8e8","l":"#a83232"}},
 cave  :{px:["........","..aaaa..",".aaaaaa.","aaa00aaa","aa0000aa","aa0000aa","aaaaaaaa","........"],
         pal:{".":"#2e9a2e","a":"#8a8a8a","0":"#0a0a0a"}},
 dwall :{px:["bbbbbbbb","b...b...","bbbbbbbb","..b...b.","bbbbbbbb","b...b...","bbbbbbbb","..b...b."],
@@ -405,7 +407,7 @@ function bakeGate(key,hFrac,cols,frame){
 const T = { DEEP:0, WATER:1, SAND:2, GRASS:3, FOREST:4, HILLS:5, MOUNT:6, SWAMP:7,
             TOWN:8, CASTLE:9, SHRINE:10, RUINS:11,
             FLOOR:12, WALL:13, DOOR:14, COUNTER:15, THRONE:16,
-            DENT:17, DFLOOR:18, DWALL:19, LADDU:20, LADDD:21, LAIR:22, FIRE:23 };
+            DENT:17, DFLOOR:18, DWALL:19, LADDU:20, LADDD:21, LAIR:22, FIRE:23, BED:24 };
 const TSPR = {
   [T.DEEP]:["deep","deep"], [T.WATER]:["water","water2"], [T.SAND]:["sand","sand"],
   [T.GRASS]:["grass","grass2"], [T.FOREST]:["forest","forest"], [T.HILLS]:["hills","hills"],
@@ -416,6 +418,7 @@ const TSPR = {
   [T.DENT]:["cave","cave"], [T.DFLOOR]:["dfloor","dfloor"], [T.DWALL]:["dwall","dwall"],
   [T.LADDU]:["laddu","laddu"], [T.LADDD]:["laddd","laddd"],
   [T.LAIR]:["lair","lair"], [T.FIRE]:["fire","fire2"],
+  [T.BED]:["bed","bed"],
 };
 const WALK_LAND  = new Set([T.SAND,T.GRASS,T.FOREST,T.HILLS,T.SWAMP,T.TOWN,T.CASTLE,T.SHRINE,T.RUINS,T.FLOOR,T.DOOR,T.DENT,T.LAIR]);
 const WALK_SHIP  = new Set([T.DEEP,T.WATER]);
@@ -727,8 +730,12 @@ town0:{
   "gg,,,,,,t,t,,,,,,gg",
   "gg####,,,,,,,####gg",
   "gg#4.D,,,,,,,D.5#gg",
-  "gg#..#g,,,,,g#..#gg",
-  "gg####g,,,,,g####gg",
+  "gg#..#,,,,,,,#..#gg",
+  "gg####,,,,,,,####gg",
+  "g,,,,,,,,,,,,,,,,,g",
+  "g#D####,#D##,#D##,g",
+  "g#...C#,#B.#,#B.#,g",
+  "g######,####,####,g",
   "ggggggggggggggggggg",
   ]),
   npcs:{
@@ -787,6 +794,10 @@ town1:{
   "g#,,,,,,,,,,,,,,,#g",
   "g########,########g",
   "gg,,,,,,,@,,,,,,,gg",
+  "g,,,,,,,,,,,,,,,,,g",
+  "g#D####,#D##,#D##,g",
+  "g#...C#,#B.#,#B.#,g",
+  "g######,####,####,g",
   "ggggggggggggggggggg",
   ]),
   npcs:{
@@ -850,6 +861,10 @@ town2:{
   "g,#5.#,~~~,#..#,g",
   "g,####,~~~,####,g",
   "g,,,,,,~~~,,,,,,g",
+  "g,,,,,,,,,,,,,,,g",
+  "g#D####,#D##,,,,g",
+  "g#...C#,#B.#,,,,g",
+  "g######,####,,,,g",
   "ggggggggggggggggg",
   ]),
   npcs:{
@@ -910,6 +925,10 @@ willowdale:{
   "g,,,,####,,,####,,g",
   "g,,,,#5.D,,,,,,,t,g",
   "g,t,,####,,t,,,,,,g",
+  "g,,,,,,,,,,,,,,,,,g",
+  "g#D####,#D##,#D##,g",
+  "g#...C#,#B.#,#B.#,g",
+  "g######,####,####,g",
   "ggggggggggggggggggg",
   ]),
   npcs:{
@@ -961,6 +980,10 @@ goldport:{
   "g,####,####,,~~~~~g",
   "g,#4.D,D.5#,,~~~~~g",
   "g,####,####,,,,,,,g",
+  "g,,,,,,,,,,,,,,,,,g",
+  "g#D####,#D##,#D##,g",
+  "g#...C#,#B.#,#B.#,g",
+  "g######,####,####,g",
   "ggggggggggggggggggg",
   ]),
   npcs:{
@@ -1012,7 +1035,11 @@ stonevale:{
   "gw,####,,####,,wg",
   "gw,#4.D,,D..#,,wg",
   "gw,####,,####,,wg",
-  "gwwwwwwwwwwwwwwwg",
+  "gwwwwwww,wwwwwwwg",
+  "g,,,,,,,,,,,,,,,g",
+  "g#D####,#D##,,,,g",
+  "g#...C#,#B.#,,,,g",
+  "g######,####,,,,g",
   "ggggggggggggggggg",
   ]),
   npcs:{
@@ -1176,6 +1203,39 @@ void:{
 };
 // map town index to LOC key (indexes 0-4 mainland, 5 = the pirate isle)
 const TOWN_KEYS=["town0","town1","willowdale","goldport","stonevale","town2"];
+
+// —— NPC agendas ——————————————————————————————————————————————
+// Work at the marker spot; s = evening social spot; h = night bed.
+// `always` folk never sleep and trade at all hours (guards, healers, pirates).
+(function(){
+  const A=(loc,who,data)=>{ const n=Object.values(LOCS[loc].npcs).find(n=>n.name.includes(who));
+    if(n) Object.assign(n,data); };
+  A("castle","Lumen",{always:1}); A("castle","Gareth",{always:1}); A("castle","Souls",{always:1});
+  A("castle","Cedric",{h:[17,3]}); A("castle","Pip",{s:[7,7],h:[2,10]});
+  A("town0","Ana",{always:1,s:[3,16],h:[9,16]}); A("town0","Tam",{s:[4,16]});
+  A("town0","Lyra",{s:[2,16],h:[2,16]}); A("town0","Marla",{h:[14,16]});
+  A("town1","Grimm",{s:[2,13]}); A("town1","Wystan",{s:[3,13],h:[9,13]});
+  A("town1","Fenn",{s:[4,13],h:[14,13]}); A("town1","Hilda",{h:[15,13]});
+  A("town1","Roke",{always:1});
+  A("willowdale","Etta",{always:1}); A("willowdale","Col",{s:[3,14],h:[9,14]});
+  A("willowdale","Bess",{s:[4,14],h:[14,14]}); A("willowdale","Puck",{always:1,s:[2,14]});
+  A("goldport","Hale",{s:[2,15]}); A("goldport","Ives",{s:[3,15],h:[9,15]});
+  A("goldport","Rena",{always:1,s:[4,15]}); A("goldport","Wick",{h:[14,15]});
+  A("town2","Meg",{always:1}); A("town2","Silas",{always:1,s:[7,2],h:[9,15]});
+  A("town2","Rafe",{always:1,s:[7,3]}); A("town2","Scab",{always:1,s:[9,3],h:[10,15]});
+  A("town2","Salt",{always:1,s:[9,2]});
+  A("stonevale","Brakk",{s:[2,15]}); A("stonevale","Iva",{always:1});
+  A("stonevale","Oth",{s:[3,15],h:[9,15]}); A("stonevale","Guss",{s:[4,15]});
+})();
+function phaseSpot(n){
+  const ph=dayPhase();
+  if(ph==="social" && n.s) return {x:n.s[0],y:n.s[1]};
+  if(ph==="sleep"){
+    if(n.h) return {x:n.h[0],y:n.h[1]};
+    if(n.always && n.s) return {x:n.s[0],y:n.s[1]};   // pirates drink till dawn
+  }
+  return {x:n.wx,y:n.wy};
+}
 
 // the Seer reads each virtue by name
 {
@@ -1550,13 +1610,15 @@ function tileAt(x,y){
       case "C": return T.COUNTER; case "R": return T.THRONE; case "t": return T.FOREST;
       case "~": return T.WATER; case "d": return T.DFLOOR; case "w": return T.DWALL;
       case "s": return T.SHRINE; case "F": return T.FIRE; case "x": return T.DOOR;
-      case "r": return T.RUINS;
+      case "r": return T.RUINS; case "B": return T.BED;
       default: return T.GRASS;
     }
   }
   return gw(x,y);
 }
 function isNight(){ const d=turns%400; return d>=280; }
+// the town day: folk work, then drink, then sleep
+function dayPhase(){ const d=turns%400; return d<280? "work" : d<350? "social" : "sleep"; }
 // two moons: Argent opens the gates, Umbra chooses where they lead
 function argent(){ return Math.floor(turns/24)%GATES.length; }
 function umbra(){ return Math.floor(turns/8)%GATES.length; }
@@ -1669,7 +1731,8 @@ function renderStats(){
   if(nr) html+=`<div class="srow"><span>Relics</span><b style="color:var(--blue)">${nr}/9</b></div>`;
   if(P.silverKey) html+=`<div class="srow"><span>Key</span><b style="color:#cfd8e8">Silver</b></div>`;
   html+=`<div class="srow"><span>Moons</span><b>${MOONG[argent()]}${MOONG[umbra()]} ${argent()+1}→${umbra()+1}</b></div>`;
-  html+=`<div class="srow"><span>Time</span><b>${inDun?"dark":"" || (isNight()?"night":"day")} · t${turns}</b></div>`;
+  const phLabel=inDun?"dark": dayPhase()==="work"?"day": dayPhase()==="social"?"evening":"night";
+  html+=`<div class="srow"><span>Time</span><b>${phLabel} · t${turns}</b></div>`;
   html+=`<div class="srow"><span>Place</span><b>${
     inDun? `${DUNGEONS[inDun.idx].name} L${inDun.lvl+1}` : inLoc? LOCS[inLoc.key].name : "Albion"}</b></div>`;
   if(P.relics.sextant && !inLoc && !inDun)
@@ -1870,12 +1933,15 @@ function enterLoc(){
     if(L.npcs[ch]){
       const def=L.npcs[ch];
       if(!(key==="town2" && P.finalDone && def.name==="Pirate King Rafe"))
-        npcs.push(Object.assign({x,y},def));
+        npcs.push(Object.assign({x,y,wx:x,wy:y},def));
       grid[y][x]=(grid[y][x-1]===","||grid[y][x+1]===",")?",":"."; }
     else if(ch==="@"){ entry={x,y}; grid[y][x]=","; }
   }
   inLoc={key, map:grid.map(r=>r.join("")), npcs, w:grid[0].length, h:grid.length,
          ret:{x:P.x,y:P.y}};
+  // townsfolk start the visit wherever their day has taken them
+  for(const n of npcs){ const sp=phaseSpot(n);
+    if(!(sp.x===n.x&&sp.y===n.y) && !npcs.some(o=>o!==n&&o.x===sp.x&&o.y===sp.y)){ n.x=sp.x; n.y=sp.y; } }
   P.x=entry?entry.x:Math.floor(inLoc.w/2);
   P.y=entry?entry.y:inLoc.h-2;
   // the traitor's court: six extra guards muster in the great hall
@@ -2557,6 +2623,22 @@ function tick(){
   if(P.relics.regen && turns%3===0 && P.hp<P.maxhp) P.hp++;
   if(P.hp<=0){ playerDeath(); render(); return; }
   monsterTurn();
+  // townsfolk go about their day — an amble toward wherever the hour calls them
+  if(inLoc && !inLoc.raid && turns%2===0){
+    for(const n of inLoc.npcs){
+      const sp=phaseSpot(n);
+      if(n.x===sp.x && n.y===sp.y) continue;
+      const dx=Math.sign(sp.x-n.x), dy=Math.sign(sp.y-n.y);
+      const opts=[];
+      if(dx&&dy){ if(R()<.5) opts.push([dx,0],[0,dy]); else opts.push([0,dy],[dx,0]); }
+      else if(dx) opts.push([dx,0]); else if(dy) opts.push([0,dy]);
+      for(const[ox,oy] of opts){
+        const nx=n.x+ox, ny=n.y+oy;
+        if(passable(nx,ny) && !npcAt(nx,ny) && !(nx===P.x&&ny===P.y) && !monsterAt(nx,ny)
+           && inLoc.map[ny][nx]!=="g" && inLoc.map[ny][nx]!=="x"){ n.x=nx; n.y=ny; break; }
+      }
+    }
+  }
   if((mode==="play"||mode==="won") && !inDun && !inLoc) { spawnMonsters(); cullMonsters(); }
   // moored ships slowly mend
   if(turns%4===0) ships.forEach((s,i)=>{ if(!(P.onShip&&i===P.shipIdx) && s.hull<s.maxhull) s.hull++; });
@@ -2685,27 +2767,44 @@ function tick(){
 //---------------------------------------------------------------
 // 15. Commands
 //---------------------------------------------------------------
+function topicKeys(n){ return Object.keys(n.lines).slice(0,6); }  // deeper topics stay secrets
+function listTopics(n){
+  msg("Topics: "+topicKeys(n).map((k,i)=>`${i+1} ${k.toUpperCase()}`).join(" · ")
+    +" · BYE  (pick a number, or speak thy mind)","m-sys");
+}
 function cmdTalk(dx,dy){
   const n=npcAt(P.x+dx,P.y+dy);
   if(!n){ msg("Funny — no response.","m-sys"); return; }
+  if(dayPhase()==="sleep" && !n.always){ msg(`${n.name} is fast asleep. Zzz...`,"m-sys"); return; }
   msg(n.greet,"m-blue");
-  msg(`(Speak with ${n.name} — try NAME, JOB, MANTRA... BYE ends.)`,"m-sys");
+  const t=playerTitle();
+  if(P.avatar || P.trialDone || t==="the Paragon")
+    msg(`${n.name} bows low. "An honor, ${t.replace(/^the /,"")}."`,"m-blue");
+  else if(P.virtues[0]<15 && n.spr==="guard")
+    msg(`${n.name} watches thy hands warily.`,"m-bad");
+  listTopics(n);
   talkLoop(n);
 }
 function talkLoop(n){
   openPrompt("You say:",(text)=>{
-    const q=text.toLowerCase();
+    const q=text.toLowerCase().trim();
     if(!q || q==="bye"||q==="farewell"){ msg(`"${q==="" ? "..." : "Fare thee well."}"`,"m-say"); render(); return; }
+    let sel=null;
+    if(/^\d+$/.test(q)) sel=topicKeys(n)[parseInt(q)-1]||null;
     let handled=false;
-    if(q.includes("name")){ msg(`"I am ${n.name}."`,"m-say"); handled=true; }
-    else if(q.includes("health")){ msg(`"I am well, thank thee."`,"m-say"); handled=true; }
+    if(q==="topics"){ listTopics(n); handled=true; }
+    else if(!sel && q.includes("name")){ msg(`"I am ${n.name}."`,"m-say"); handled=true; }
+    else if(!sel && q.includes("health")){ msg(`"I am well, thank thee."`,"m-say"); handled=true; }
     else {
       for(const key in n.lines){
-        if(q.includes(key)){
+        if(sel ? key===sel : q.includes(key)){
           const v=n.lines[key];
           if(typeof v==="string") msg(`"${v}"`,"m-say");
           else if(typeof v==="function") v();
-          else if(v.shop){ openShop(v.shop,n); return; }
+          else if(v.shop){
+            if(dayPhase()!=="work" && !n.always){ msg(`"The shop is shut till morning, friend."`,"m-say"); handled=true; break; }
+            openShop(v.shop,n); return;
+          }
           else if(v.ask){ askYesNo(v.ask,v.yes,v.no,()=>{ if(!(inLoc&&inLoc.raid)) talkLoop(n); }); return; }
           handled=true; break;
         }
