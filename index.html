@@ -14,12 +14,18 @@
   *{box-sizing:border-box; margin:0; padding:0;}
   html,body{background:var(--bg); color:var(--fg); font-family:"Courier New",Courier,monospace; height:100%;}
   body{display:flex; align-items:center; justify-content:center;}
-  #frame{display:grid; grid-template-columns:auto 240px; grid-template-rows:auto 170px; gap:8px; padding:10px;}
+  #frame{display:grid; grid-template-columns:420px 240px; grid-template-rows:auto 190px; gap:8px; padding:10px;}
   #screen{grid-column:1; grid-row:1; border:2px solid var(--border); image-rendering:pixelated; background:#000;}
   #stats{grid-column:2; grid-row:1 / span 2; border:2px solid var(--border); background:var(--panel);
          padding:10px 12px; font-size:13px; line-height:1.5; overflow:hidden;}
   #logbox{grid-column:1; grid-row:2; border:2px solid var(--border); background:var(--panel);
-          padding:8px 12px; font-size:14px; overflow:hidden; display:flex; flex-direction:column; justify-content:flex-end;}
+          padding:8px 12px; font-size:14px; overflow:hidden; display:flex; flex-direction:column;
+          justify-content:flex-end; min-width:0; max-width:420px;}
+  #choices{display:none; flex-wrap:wrap; gap:4px; margin-top:4px;}
+  #choices.on{display:flex;}
+  .chip{border:1px solid var(--border); background:#10101e; color:var(--blue); font:inherit;
+        font-size:12px; padding:1px 9px; cursor:pointer; border-radius:9px; user-select:none;}
+  .chip:hover{border-color:var(--accent); color:var(--accent);}
   #log div{white-space:pre-wrap;}
   .m-sys{color:var(--dim);} .m-say{color:var(--fg);} .m-good{color:var(--green);}
   .m-bad{color:var(--red);} .m-gold{color:var(--accent);} .m-blue{color:var(--blue);}
@@ -59,6 +65,7 @@
   <div id="stats"></div>
   <div id="logbox">
     <div id="log"></div>
+    <div id="choices"></div>
     <div id="prompt"><span class="pfx" id="ppfx">&gt;</span><input id="tin" autocomplete="off" spellcheck="false"></div>
   </div>
 </div>
@@ -1572,14 +1579,31 @@ function msg(text,cls="m-say"){
   while(LOG.length>7) LOG.shift();
   logEl.innerHTML = LOG.map(l=>`<div class="${l.cls}">${esc(l.text)}</div>`).join("");
 }
-function openPrompt(prefix,cb){
+function openPrompt(prefix,cb,choices){
   mode="text"; pending={cb};
   ppfx.textContent=prefix;
   promptEl.classList.add("on");
+  const ch=document.getElementById("choices");
+  ch.innerHTML="";
+  if(choices && choices.length){
+    for(const c of choices){
+      const b=document.createElement("button");
+      b.className="chip"; b.textContent=c.label;
+      b.addEventListener("click",()=>{
+        const f=pending&&pending.cb;
+        closePrompt();
+        if(f) f(c.value);
+      });
+      ch.appendChild(b);
+    }
+    ch.classList.add("on");
+  } else ch.classList.remove("on");
   tin.value=""; setTimeout(()=>tin.focus(),0);
 }
 function closePrompt(){
   promptEl.classList.remove("on");
+  const ch=document.getElementById("choices");
+  ch.classList.remove("on"); ch.innerHTML="";
   tin.blur(); mode="play"; pending=null;
 }
 tin.addEventListener("keydown",e=>{
@@ -2802,9 +2826,9 @@ function tick(){
 // 15. Commands
 //---------------------------------------------------------------
 function topicKeys(n){ return Object.keys(n.lines).slice(0,6); }  // deeper topics stay secrets
-function listTopics(n){
-  msg("Topics: "+topicKeys(n).map((k,i)=>`${i+1} ${k.toUpperCase()}`).join(" · ")
-    +" · BYE  (pick a number, or speak thy mind)","m-sys");
+function topicChips(n){
+  return topicKeys(n).map(k=>({label:k.toUpperCase(), value:k}))
+    .concat([{label:"BYE", value:"bye"}]);
 }
 function cmdTalk(dx,dy){
   const n=npcAt(P.x+dx,P.y+dy);
@@ -2816,7 +2840,6 @@ function cmdTalk(dx,dy){
     msg(`${n.name} bows low. "An honor, ${t.replace(/^the /,"")}."`,"m-blue");
   else if(P.virtues[0]<15 && n.spr==="guard")
     msg(`${n.name} watches thy hands warily.`,"m-bad");
-  listTopics(n);
   talkLoop(n);
 }
 function talkLoop(n){
@@ -2826,8 +2849,7 @@ function talkLoop(n){
     let sel=null;
     if(/^\d+$/.test(q)) sel=topicKeys(n)[parseInt(q)-1]||null;
     let handled=false;
-    if(q==="topics"){ listTopics(n); handled=true; }
-    else if(!sel && q.includes("name")){ msg(`"I am ${n.name}."`,"m-say"); handled=true; }
+    if(!sel && q.includes("name")){ msg(`"I am ${n.name}."`,"m-say"); handled=true; }
     else if(!sel && q.includes("health")){ msg(`"I am well, thank thee."`,"m-say"); handled=true; }
     else {
       for(const key in n.lines){
@@ -2846,7 +2868,7 @@ function talkLoop(n){
     }
     if(!handled) msg(`"That I cannot help thee with."`,"m-sys");
     talkLoop(n);
-  });
+  }, topicChips(n));
 }
 function askYesNo(question,yes,no,after){
   msg(question,"m-blue");
@@ -2855,13 +2877,12 @@ function askYesNo(question,yes,no,after){
     if(v.startsWith("y")) yes(); else if(v.startsWith("n")) no();
     else msg("They await a straight answer... but shrug.","m-sys");
     if(after) after();
-  });
+  }, [{label:"Yes",value:"y"},{label:"No",value:"n"}]);
 }
 function openShop(kind,n){
   const s=SHOPS[kind];
   msg(`— ${s.title} —`,"m-gold");
-  s.items.forEach((it,i)=>msg(`  ${i+1}. ${it.name} — ${it.cost}g`,"m-say"));
-  openPrompt("Buy #:",(t)=>{
+  openPrompt("Buy:",(t)=>{
     const i=parseInt(t)-1;
     if(isNaN(i)||!s.items[i]){ msg("\"Another time, then.\"","m-sys"); if(n) talkLoop(n); return; }
     const it=s.items[i];
@@ -2880,7 +2901,8 @@ function openShop(kind,n){
     }
     renderStats();
     if(n) talkLoop(n);
-  });
+  }, s.items.map((it,i)=>({label:`${it.name} ${it.cost}g`, value:String(i+1)}))
+      .concat([{label:"Nothing", value:""}]));
 }
 
 function fireCannon(dx,dy){

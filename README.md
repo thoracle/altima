@@ -37,7 +37,8 @@ thy progress.
 - Living towns: every villager keeps a daily agenda — working by day,
   drinking in the tavern by evening, asleep in a real bed at night
   (shops keep hours; guards, healers, and pirates never rest)
-- Topic-menu dialogue (pick a number) layered over free keyword typing —
+- IM-style dialogue: topics, shop wares, and yes/no questions appear
+  as clickable reply chips (numbers and free typing still work) —
   secrets still hide behind unlisted words, and the folk greet a
   Paragon differently than a Stranger
 - Roguelike bump combat everywhere: overworld, 5-level dungeons, and a
