@@ -29,8 +29,8 @@ thy progress.
 
 - Procedural overworld (fixed seed) with six towns, a castle, dungeons,
   shrines, and ship-only islands
-- Eight moongates ruled by two moons, Ultima-style: Trammel's phase opens
-  a gate, Felucca's phase chooses where it leads
+- Eight moongates ruled by two moons: silver Argent's phase opens a
+  gate, dark Umbra's phase chooses where it leads
 - Original chiptune score — overworld, town, dungeon, and sea themes
   (V toggles music)
 - Keyword-based NPC dialogue (type NAME, JOB, MANTRA, ...)

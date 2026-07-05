@@ -601,10 +601,10 @@ castle:{
    "4":{name:"Mirren the Seer",spr:"mage",peace:true,
      greet:"A robed seer studies a glowing orb.",
      lines:{ job:"I read the moons and the gates they open.",
-       moon:"Two moons rule the eight gates: TRAMMEL raises one doorway of light as she turns, and FELUCCA chooses where it carries thee. Watch them both.",
-       gate:"Eight blue doors stand in the wild. Trammel opens; Felucca aims. When the moons agree, the gate leads nowhere at all.",
-       trammel:"The slow moon. Her phase decides WHICH gate stands open.",
-       felucca:"The swift moon. Her phase decides WHERE the open gate leads.",
+       moon:"Two moons rule the eight gates: ARGENT raises one doorway of light as she turns, and UMBRA chooses where it carries thee. Watch them both.",
+       gate:"Eight blue doors stand in the wild. Argent opens; Umbra aims. When the moons agree, the gate leads nowhere at all.",
+       argent:"The slow moon. Her phase decides WHICH gate stands open.",
+       umbra:"The swift moon. Her phase decides WHERE the open gate leads.",
        curse:"When the moons darken, a gate sticks open and burns red — and the dead walk out of it. Someone must go IN.",
        dead:"Bone and shade serve the Barrow King beyond the corrupted gate. Steel and spirit send them back.",
        barrow:"The Silver Barrow was sealed before the castle's first stone. The Barrow King took its key into death with him.",
@@ -856,7 +856,7 @@ willowdale:{
    "3":{name:"Hermit Dain",spr:"mage",peace:true,
      greet:"A hermit sits cross-legged by the pond, eyes closed.",
      lines:{ job:"I listen to the water. It has opinions.",
-       moon:"Two moons, eight doors. Trammel opens, Felucca sends. The water showed me once.",
+       moon:"Two moons, eight doors. Argent opens, Umbra sends. The water showed me once.",
        relic:"The old magic sleeps in things now, not words. Deep places. Drowned places. Dead places.",
        mantra:"OM binds the seven. Breathe it slow.",
        pond:"The pond? Older than the town. Possibly wiser." }},
@@ -1475,10 +1475,10 @@ function tileAt(x,y){
   return gw(x,y);
 }
 function isNight(){ const d=turns%400; return d>=280; }
-// two moons: Trammel opens the gates, Felucca chooses where they lead
-function trammel(){ return Math.floor(turns/24)%GATES.length; }
-function felucca(){ return Math.floor(turns/8)%GATES.length; }
-function moonPhase(){ return trammel(); }
+// two moons: Argent opens the gates, Umbra chooses where they lead
+function argent(){ return Math.floor(turns/24)%GATES.length; }
+function umbra(){ return Math.floor(turns/8)%GATES.length; }
+function moonPhase(){ return argent(); }
 
 function render(){
   cx.fillStyle="#000"; cx.fillRect(0,0,cv.width,cv.height);
@@ -1497,9 +1497,9 @@ function render(){
   };
   if(!inLoc){
     if(!inDun){
-      const g=GATES[trammel()];
+      const g=GATES[argent()];
       if(g){
-        // the doorway rises, stands, then sinks with Trammel's passage
+        // the doorway rises, stands, then sinks with Argent's passage
         const p=(turns%24)/24;
         const stage = p<.12?0 : p<.25?1 : p<.75?2 : p<.88?1 : 0;
         draw(`gate${stage}f${animF}`,g.x,g.y);
@@ -1566,7 +1566,7 @@ function renderStats(){
   const nr=Object.values(P.relics).filter(Boolean).length;
   if(nr) html+=`<div class="srow"><span>Relics</span><b style="color:var(--blue)">${nr}/9</b></div>`;
   if(P.silverKey) html+=`<div class="srow"><span>Key</span><b style="color:#cfd8e8">Silver</b></div>`;
-  html+=`<div class="srow"><span>Moons</span><b>${MOONG[trammel()]}${MOONG[felucca()]} ${trammel()+1}→${felucca()+1}</b></div>`;
+  html+=`<div class="srow"><span>Moons</span><b>${MOONG[argent()]}${MOONG[umbra()]} ${argent()+1}→${umbra()+1}</b></div>`;
   html+=`<div class="srow"><span>Time</span><b>${inDun?"dark":"" || (isNight()?"night":"day")} · t${turns}</b></div>`;
   html+=`<div class="srow"><span>Place</span><b>${
     inDun? `${DUNGEONS[inDun.idx].name} L${inDun.lvl+1}` : inLoc? LOCS[inLoc.key].name : "Albion"}</b></div>`;
@@ -1688,13 +1688,13 @@ function shrineVirtue(x,y){ const i=shrineIndex(x,y); return i>=0?VIRTUES[i]:"?"
 
 function enterGate(){
   sfx.gate();
-  const dest=GATES[felucca()];
+  const dest=GATES[umbra()];
   if(dest.x===P.x && dest.y===P.y){
-    msg("The gate flickers — and returns thee whence thou stood. Felucca is unkind.","m-blue");
+    msg("The gate flickers — and returns thee whence thou stood. Umbra is unkind.","m-blue");
     return;
   }
   P.x=dest.x; P.y=dest.y;
-  msg("Blue fire swallows thee — Felucca carries thee elsewhere!","m-blue");
+  msg("Blue fire swallows thee — Umbra carries thee elsewhere!","m-blue");
 }
 
 function virtueAvg(){ return P.virtues.reduce((a,b)=>a+b,0)/8; }
