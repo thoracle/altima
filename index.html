@@ -152,6 +152,19 @@ const TUNES={
   dirge:{bpm:50,   // "The Clerics' Lament" — for the fallen
     mel:[[69,2],[67,2],[65,2],[64,3],[0,1],[65,2],[64,2],[62,2],[60,3],[0,1],[57,4],[0,2]],
     bass:[[45,4],[41,4],[40,4],[33,4]]},
+  castle:{bpm:84,  // "The Court of Lumen" — a stately processional
+    mel:[[65,1],[69,1],[72,1.5],[74,.5],[72,1],[69,1],[70,2],[65,1],[67,1],[69,1.5],[70,.5],[69,1],[65,1],[67,2],
+         [72,1],[74,1],[77,1.5],[76,.5],[74,1],[72,1],[74,2],[72,1],[70,1],[69,1],[67,1],[65,2],[0,2]],
+    bass:[[41,2],[46,2],[43,2],[48,2],[41,2],[46,2],[48,2],[41,2]]},
+  battle:{bpm:150, // "Steel and Smoke" — for every raid
+    mel:[[57,.5],[57,.5],[60,.5],[57,.5],[62,.5],[60,.5],[57,.5],[55,.5],
+         [57,.5],[57,.5],[64,.5],[62,.5],[60,.5],[62,.5],[64,1],
+         [65,.5],[64,.5],[62,.5],[60,.5],[62,.5],[60,.5],[57,.5],[56,.5],[57,1],[0,.5]],
+    bass:[[33,.5],[33,.5],[45,.5],[33,.5],[36,.5],[36,.5],[48,.5],[36,.5],
+          [38,.5],[38,.5],[50,.5],[38,.5],[40,.5],[40,.5],[52,.5],[40,.5]]},
+  shrine:{bpm:56, mtype:"sine",  // "The Still Light" — a hymn for meditation
+    mel:[[74,3],[76,1],[74,2],[71,2],[69,3],[71,1],[74,4],[71,3],[69,1],[67,2],[69,2],[71,3],[69,1],[66,4],[0,2]],
+    bass:[[38,8],[43,8],[38,8],[45,8]]},
   sea:{bpm:104,    // "Under Dead Wind" — A minor, rolling
     mel:[[57,.75],[60,.75],[64,.75],[65,.75],[64,.75],[60,.75],[62,.75],[59,.75],[60,.75],[57,.75],[55,1.5],[0,.75],
          [64,.75],[67,.75],[71,.75],[69,.75],[67,.75],[64,.75],[65,.75],[62,.75],[64,1.5],[0,.75]],
@@ -176,13 +189,19 @@ function musicPump(){
     const T=TUNES[MUS.tune], spb=60/T.bpm, edge=AC.currentTime+.5;
     if(MUS.mNext<AC.currentTime) MUS.mNext=AC.currentTime+.05;
     if(MUS.bNext<AC.currentTime) MUS.bNext=AC.currentTime+.05;
-    while(MUS.mNext<edge){ const[n,d]=T.mel[MUS.mi++%T.mel.length];  mNote(mf(n),MUS.mNext,d*spb,"square",.02);   MUS.mNext+=d*spb; }
-    while(MUS.bNext<edge){ const[n,d]=T.bass[MUS.bi++%T.bass.length]; mNote(mf(n),MUS.bNext,d*spb,"triangle",.022); MUS.bNext+=d*spb; }
+    while(MUS.mNext<edge){ const[n,d]=T.mel[MUS.mi++%T.mel.length];  mNote(mf(n),MUS.mNext,d*spb,T.mtype||"square",.02);   MUS.mNext+=d*spb; }
+    while(MUS.bNext<edge){ const[n,d]=T.bass[MUS.bi++%T.bass.length]; mNote(mf(n),MUS.bNext,d*spb,T.btype||"triangle",.022); MUS.bNext+=d*spb; }
   }catch(e){}
 }
 function updateTune(){
   const name = mode==="dead"? "dirge"
-    : inDun? "dungeon" : inLoc? "town" : (P&&P.onShip)? "sea" : "world";
+    : (inLoc&&inLoc.raid)? "battle"
+    : inDun? "dungeon"
+    : (inLoc&&inLoc.key==="castle")? "castle"
+    : inLoc? "town"
+    : (P&&P.onShip)? "sea"
+    : (P&&gw(P.x,P.y)===T.SHRINE)? "shrine"
+    : "world";
   if(MUS.tune===name) return;
   MUS.tune=name; MUS.mi=0; MUS.bi=0;
   if(AC){ MUS.mNext=AC.currentTime+.15; MUS.bNext=AC.currentTime+.15; }

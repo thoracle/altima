@@ -31,7 +31,8 @@ thy progress.
   shrines, and ship-only islands
 - Eight moongates ruled by two moons: silver Argent's phase opens a
   gate, dark Umbra's phase chooses where it leads
-- Original chiptune score — overworld, town, dungeon, and sea themes
+- Original chiptune score — eight themes: overworld, town, castle,
+  dungeon, sea, shrine hymn, battle, and a death dirge
   (V toggles music)
 - Keyword-based NPC dialogue (type NAME, JOB, MANTRA, ...)
 - Roguelike bump combat everywhere: overworld, 5-level dungeons, and a
