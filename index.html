@@ -12,8 +12,9 @@
     --green:#6fdc6f; --red:#ff6f6f; --panel:#0a0a12; --border:#3a3a5a;
   }
   *{box-sizing:border-box; margin:0; padding:0;}
-  html,body{background:var(--bg); color:var(--fg); font-family:"Courier New",Courier,monospace; height:100%;}
-  body{display:flex; align-items:center; justify-content:center;}
+  html,body{background:var(--bg); color:var(--fg); font-family:"Courier New",Courier,monospace; min-height:100%;}
+  body{display:block; overflow:auto;}
+  #frame{width:max-content; margin:2vh auto 0;}
   #frame{display:grid; grid-template-columns:420px 240px; grid-template-rows:auto 190px; gap:8px; padding:10px;}
   #screen{grid-column:1; grid-row:1; border:2px solid var(--border); image-rendering:pixelated; background:#000;}
   #stats{grid-column:2; grid-row:1 / span 2; border:2px solid var(--border); background:var(--panel);
@@ -64,10 +65,8 @@
   #sndbtn:hover{border-color:var(--accent);}
   /* —— mobile chrome (body.mobile) —— */
   #mhud,#mbar,#joy{display:none;}
-  body.mobile{align-items:flex-start;}
   body.mobile #frame{display:flex; flex-direction:column; gap:4px; padding:0; width:100vw; max-width:480px; margin:0 auto;}
   body.mobile #screen{order:2; width:100%; aspect-ratio:1/1; height:auto; margin:0 auto; border-left:none; border-right:none;}
-  body.mobile #joy{left:max(14px, calc(50vw - 240px + 14px));}
   body.mobile #sndbtn{top:calc(env(safe-area-inset-top,0px) + 44px); right:8px;}
   body.mobile #mhud{display:flex; order:1; justify-content:space-between; align-items:center;
     padding:calc(env(safe-area-inset-top,0px) + 6px) 12px 6px; font-size:14px; width:100%;
@@ -3865,6 +3864,11 @@ $("sndbtn").addEventListener("click",e=>{
 const IS_MOBILE = matchMedia("(pointer:coarse)").matches || innerWidth<720
                || /[?&]mobile=1/.test(location.search);   // dev preview override
 function pressKey(k){ document.dispatchEvent(new KeyboardEvent("keydown",{key:k})); }
+// "press any key" must also mean "tap anywhere" — phones have no keys
+$("overlay").addEventListener("click",()=>{
+  ensureMusic();
+  if(mode==="title"||mode==="dead"||mode==="won"||mode==="help") pressKey(" ");
+});
 function contextAction(){
   if(!P || mode==="title") return ["…",null];
   if(mode==="dead"||mode==="won"||mode==="help"||mode==="map") return ["Continue"," "];
@@ -3924,7 +3928,10 @@ if(IS_MOBILE){
   $("mmap").addEventListener("click",()=>pressKey("p"));
   $("mwait").addEventListener("click",()=>pressKey(" "));
   $("mhud").addEventListener("click",()=>$("stats").classList.toggle("open"));
-  $("screen").addEventListener("click",()=>$("stats").classList.remove("open"));
+  $("screen").addEventListener("click",()=>{
+    if(mode==="map"){ pressKey("x"); return; }
+    $("stats").classList.remove("open");
+  });
   // joystick: hold to walk, dominant axis, arrow-key cadence
   const joy=$("joy"), knob=$("joyknob");
   let joyDir=null, joyTimer=null;
