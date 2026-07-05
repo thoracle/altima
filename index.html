@@ -1717,7 +1717,7 @@ function genDunLevel(di,lvl){
     const x=ri2(r.x,r.x+r.w-1), y=ri2(r.y,r.y+r.h-1);
     if(g[y*DW+x]!==T.DFLOOR || mobs.some(m=>m.x===x&&m.y===y)) continue;
     const key=tbl[Math.floor(rr()*tbl.length)], def=MONST[key];
-    mobs.push({key,name:def.name,spr:def.spr,x,y,hp:def.hp+lvl*4,dmg:def.dmg+lvl*2,
+    mobs.push({key,name:def.name,spr:def.spr,x,y,hp:def.hp+lvl*4,dmg:def.dmg+lvl,
                ac:def.ac,xp:def.xp+lvl*8,gold:[def.gold[0]+lvl*4,def.gold[1]+lvl*8],
                water:false,poison:def.poison,ranged:def.ranged});
   }
