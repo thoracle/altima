@@ -1,0 +1,2576 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:">
+<title>ALTIMA</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root{
+    --bg:#000; --fg:#eeeef2; --dim:#b0b6c8; --accent:#ffd24a; --blue:#8fbaff;
+    --green:#6fdc6f; --red:#ff6f6f; --panel:#0a0a12; --border:#3a3a5a;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html,body{background:var(--bg); color:var(--fg); font-family:"Courier New",Courier,monospace; height:100%;}
+  body{display:flex; align-items:center; justify-content:center;}
+  #frame{display:grid; grid-template-columns:auto 240px; grid-template-rows:auto 170px; gap:8px; padding:10px;}
+  #screen{grid-column:1; grid-row:1; border:2px solid var(--border); image-rendering:pixelated; background:#000;}
+  #stats{grid-column:2; grid-row:1 / span 2; border:2px solid var(--border); background:var(--panel);
+         padding:10px 12px; font-size:13px; line-height:1.5; overflow:hidden;}
+  #logbox{grid-column:1; grid-row:2; border:2px solid var(--border); background:var(--panel);
+          padding:8px 12px; font-size:14px; overflow:hidden; display:flex; flex-direction:column; justify-content:flex-end;}
+  #log div{white-space:pre-wrap;}
+  .m-sys{color:var(--dim);} .m-say{color:var(--fg);} .m-good{color:var(--green);}
+  .m-bad{color:var(--red);} .m-gold{color:var(--accent);} .m-blue{color:var(--blue);}
+  #prompt{display:none; margin-top:2px;}
+  #prompt.on{display:flex; gap:6px;}
+  #prompt .pfx{color:var(--accent);}
+  #tin{background:#000; color:var(--fg); border:1px solid var(--border); font:inherit; flex:1; outline:none; padding:0 4px;}
+  h3{color:var(--accent); font-size:13px; letter-spacing:2px; margin-bottom:4px;}
+  .vrow{display:flex; align-items:center; gap:6px; font-size:11px;}
+  .vname{width:78px; color:var(--dim);}
+  .vbar{flex:1; height:7px; background:#1a1a2a; border:1px solid #2a2a44;}
+  .vfill{height:100%; background:var(--blue);}
+  .vfill.max{background:var(--accent);}
+  .srow{display:flex; justify-content:space-between;}
+  .srow b{color:#fff; font-weight:normal;}
+  #overlay{position:fixed; inset:0; background:rgba(0,0,8,.93); display:flex; align-items:center; justify-content:center; z-index:10;}
+  #overlay.off{display:none;}
+  #obox{max-width:640px; border:2px solid var(--border); background:var(--panel); padding:28px 36px; text-align:center;}
+  #obox h1{color:var(--accent); letter-spacing:6px; font-size:30px; margin-bottom:2px;}
+  #obox h2{color:var(--blue); font-size:14px; letter-spacing:3px; margin-bottom:18px; font-weight:normal;}
+  #obox p{font-size:13px; line-height:1.6; margin-bottom:14px; text-align:left; color:var(--fg);}
+  #obox .keys{color:var(--dim); font-size:12px; text-align:left; column-count:2; margin-bottom:16px; line-height:1.7;}
+  #obox .go{color:var(--green); font-size:15px; animation:blink 1.1s steps(1) infinite;}
+  @keyframes blink{50%{opacity:.15;}}
+  kbd{color:var(--accent);}
+</style>
+</head>
+<body>
+<div id="frame">
+  <canvas id="screen" width="416" height="416"></canvas>
+  <div id="stats"></div>
+  <div id="logbox">
+    <div id="log"></div>
+    <div id="prompt"><span class="pfx" id="ppfx">&gt;</span><input id="tin" autocomplete="off" spellcheck="false"></div>
+  </div>
+</div>
+
+<div id="overlay">
+  <div id="obox">
+    <h1>ALTIMA</h1>
+    <p id="ointro">The realm of Albion suffers not from monsters alone, but from a poverty
+    of the spirit. Lord Lumen has called for one soul to master the Eight Virtues
+    and become the Saint — a living example for all the land.<br><br>
+    Thou art that Stranger, drawn through the moongate. Seek the shrines. Learn the
+    mantras. Let thy deeds speak.</p>
+    <div class="keys">
+      <div><kbd>Arrows/WASD</kbd> move & bump-attack</div>
+      <div><kbd>T</kbd> talk (then direction)</div>
+      <div><kbd>F</kbd> attack / fire cannons</div>
+      <div><kbd>E</kbd> enter / climb ladder</div>
+      <div><kbd>G</kbd> get chest</div>
+      <div><kbd>M</kbd> meditate at shrine</div>
+      <div><kbd>B</kbd> board / cross ships &nbsp;<kbd>X</kbd> go ashore</div>
+      <div><kbd>H</kbd> hole up & camp</div>
+      <div><kbd>Z</kbd> ztats &nbsp;<kbd>?</kbd> help</div>
+      <div><kbd>Shift+S</kbd> save &nbsp;<kbd>Space</kbd> pass</div>
+    </div>
+    <div class="go" id="ogo">— PRESS ANY KEY TO BEGIN —</div>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ============================================================
+   ALTIMA — an HTML5 homage to the classic Ultima IV (1985)
+   All art, text and code original. One file, no dependencies.
+   ============================================================ */
+
+//---------------------------------------------------------------
+// 0. Utilities
+//---------------------------------------------------------------
+const $ = id => document.getElementById(id);
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;}}
+const WORLD_SEED = 0xA1B10; // fixed world, consistent across saves
+let rng = mulberry32(WORLD_SEED);
+const R  = () => Math.random();               // gameplay randomness
+const ri = (a,b) => a + Math.floor(R()*(b-a+1));
+const clamp = (v,a,b)=>Math.max(a,Math.min(b,v));
+const DIRS = {up:[0,-1],down:[0,1],left:[-1,0],right:[1,0]};
+
+//---------------------------------------------------------------
+// 1. Audio — tiny square-wave bleeps
+//---------------------------------------------------------------
+let AC=null;
+function beep(freq,dur=.06,vol=.04,type="square"){
+  try{
+    AC = AC || new (window.AudioContext||window.webkitAudioContext)();
+    const o=AC.createOscillator(), g=AC.createGain();
+    o.type=type; o.frequency.value=freq;
+    g.gain.setValueAtTime(vol,AC.currentTime);
+    g.gain.exponentialRampToValueAtTime(.0001,AC.currentTime+dur);
+    o.connect(g); g.connect(AC.destination);
+    o.start(); o.stop(AC.currentTime+dur);
+  }catch(e){}
+}
+const sfx={
+  step : ()=>beep(160,.03,.02),
+  bump : ()=>beep(90,.06,.04),
+  hit  : ()=>beep(220,.08,.05,"sawtooth"),
+  miss : ()=>beep(140,.05,.03),
+  hurt : ()=>beep(70,.14,.06,"sawtooth"),
+  gold : ()=>{beep(660,.05);setTimeout(()=>beep(880,.07),60);},
+  level: ()=>{[523,659,784,1047].forEach((f,i)=>setTimeout(()=>beep(f,.1,.05),i*90));},
+  gate : ()=>{[300,420,560,720].forEach((f,i)=>setTimeout(()=>beep(f,.12,.04,"sine"),i*70));},
+  virtue:()=>{beep(784,.09,.05,"sine");setTimeout(()=>beep(1175,.14,.05,"sine"),90);},
+  die  : ()=>{[400,300,200,120].forEach((f,i)=>setTimeout(()=>beep(f,.18,.06,"sawtooth"),i*140));},
+};
+
+//---------------------------------------------------------------
+// 2. Sprites — 8x8 pixel art, palette-mapped, scaled 4x
+//---------------------------------------------------------------
+const TILE=32, VIEW=13, HALF=6;
+
+// shared humanoid silhouette; palette decides who it is
+const HUMAN = [
+"..hhhh..",
+"..hfhf..",
+".bbbbbb.",
+".b.bb.b.",
+"..bbbb..",
+"..b..b..",
+"..l..l..",
+".ll..ll."];
+
+const SPR = {
+grass :{px:["........",".s......","....s...","........","..s.....","......s.","........",".s...s.."],
+        pal:{".":"#2e9a2e","s":"#227a22"}},
+grass2:{px:["........","......s.","..s.....","........","....s...","s.......","........","...s...."],
+        pal:{".":"#2e9a2e","s":"#227a22"}},
+sand  :{px:["........","..d.....","......d.","........",".d......","....d...","........","......d."],
+        pal:{".":"#d6c06a","d":"#b49a48"}},
+water :{px:["........",".ww.....","......ww","........","ww......","....ww..","........","..ww...."],
+        pal:{".":"#123c96","w":"#3f7fd9"}},
+water2:{px:["........","...ww...","ww......","........","....ww..","......ww","........",".ww....."],
+        pal:{".":"#123c96","w":"#3f7fd9"}},
+deep  :{px:["........","..w.....","........","......w.","........",".w......","........","....w..."],
+        pal:{".":"#0b2a6e","w":"#1e4fae"}},
+forest:{px:["..TTTT..",".TTTTTT.","TTTTTTTT",".TTTTTT.","..TTTT..","...tt...","...tt...","........"],
+        pal:{".":"#2e9a2e","T":"#0f5e14","t":"#6b3f1c"}},
+hills :{px:["........","..bb....",".b..b...","........","....bb..","...b..b.","........",".bb....."],
+        pal:{".":"#2e9a2e","b":"#8a6a3a"}},
+mount :{px:["...aa...","..aWWa..",".aaWaaa.","aaaaaaaa",".aa..aa.","aWa..aaa","aaaa.aaa","aaaaaaaa"],
+        pal:{".":"#555","a":"#8a8a8a","W":"#cfcfcf"}},
+swamp :{px:["........",".oo..w..","........","w...oo..","...w....",".oo...w.","........","..w.oo.."],
+        pal:{".":"#33502a","o":"#7fae53","w":"#1f3a5e"}},
+town  :{px:["........",".rr..rr.","rrrrrrrr",".ww..ww.",".wDw.wDw","........","..rrrr..","..wwDw.."],
+        pal:{".":"#2e9a2e","r":"#a83232","w":"#c8b89a","D":"#5e3a1a"}},
+castle:{px:["W.W..W.W","WWW..WWW",".WWWWWW.",".W.WW.W.",".WWWWWW.",".WW..WW.",".WW..WW.",".WWDDWW."],
+        pal:{".":"#2e9a2e","W":"#d8d8e2","D":"#4a3018"}},
+shrine:{px:["...cc...","..cccc..","...cc...","...cc...","...cc...","..cccc..",".cccccc.","cccccccc"],
+        pal:{".":"#2e9a2e","c":"#e8e2cc"}},
+gate  :{px:["..gggg..",".g....g.","g......g","g......g","g......g","g......g",".g....g.","..gggg.."],
+        pal:{".":null,"g":"#5fd9ff"}},
+dgate :{px:["..gggg..",".gddddg.","gddddddg","gddddddg","gddddddg","gddddddg",".gddddg.","..gggg.."],
+        pal:{".":null,"g":"#d84a6a","d":"#1a0a14"}},
+ruins :{px:["........",".cc.....","........","....cc..","c.......","......c.","..cc....","........"],
+        pal:{".":"#2e9a2e","c":"#9a9a9a"}},
+floor :{px:["........","........","........","........","........","........","........","........"],
+        pal:{".":"#8a8296"}},
+floor2:{px:["........","..d.....","........","......d.","........","..d.....","........","......d."],
+        pal:{".":"#8a8296","d":"#7a7286"}},
+wall  :{px:["bbbbbbbb","b...b...","bbbbbbbb","..b...b.","bbbbbbbb","b...b...","bbbbbbbb","..b...b."],
+        pal:{".":"#5a5a6e","b":"#3c3c4e"}},
+door  :{px:["dddddddd","d..dd..d","d.dddd.d","d.dddd.d","d.ddddod","d.dddd.d","d..dd..d","dddddddd"],
+        pal:{".":"#3c3c4e","d":"#7a4e22","o":"#ffd24a"}},
+counter:{px:["cccccccc","cccccccc","c......c","c......c","c......c","c......c","c......c","cccccccc"],
+        pal:{".":"#5e3a1a","c":"#8a5e2e"}},
+throne:{px:[".gggggg.",".g.gg.g.",".gggggg.",".gGGGGg.",".gGGGGg.",".gggggg.",".g....g.",".g....g."],
+        pal:{".":null,"g":"#d8a018","G":"#a83232"}},
+chest :{px:["........","........",".cccccc.",".cgggg c",".cccccc.",".c.gg.c.",".cccccc.","........"],
+        pal:{".":null,"c":"#7a4e22","g":"#ffd24a"," ":"#7a4e22"}},
+ship  :{px:["...m....","..sss...",".sssss..","..sss...","...m....",".hhhhhh.","hhhhhhhh",".hhhhhh."],
+        pal:{".":null,"m":"#6b3f1c","s":"#e8e8e8","h":"#7a4e22"}},
+gships:{px:["...m....","..sss...",".sssss..","..sss...","...m....",".hhhhhh.","hhhhhhhh",".hhhhhh."],
+        pal:{".":null,"m":"#8a94c8","s":"#cfd8ff","h":"#6a74a8"}},
+water_p:{px:["........","........","...pp...","..pppp..","...pp...","..p..p..","........","........"],
+        pal:{".":null,"p":"#3f7fd9"}},
+snake :{px:["........","..sss...",".s...s..","....s...","...s....","..s.....","..sssse.","........"],
+        pal:{".":null,"s":"#3fae3f","e":"#ff4a4a"}},
+rat   :{px:["........","........",".e......","gg....g.","gggggg.t",".gggg.t.","..g..g..","........"],
+        pal:{".":null,"g":"#9a8a7a","e":"#ff4a4a","t":"#c8a8a8"}},
+serpent:{px:["...ss...","..se.s..","...ss...","....ss..",".....ss.","..ssss..",".ss.....","........"],
+        pal:{".":null,"s":"#2ea2c8","e":"#ff4a4a"}},
+pships:{px:["...m....","..sss...",".sxsss..","..sss...","...m....",".hhhhhh.","hhhhhhhh",".hhhhhh."],
+        pal:{".":null,"m":"#2a2a2a","s":"#3a3a3a","x":"#e8e8e8","h":"#3a2410"}},
+kraken:{px:["........","..t..t..",".t.tt.t.","..tttt..",".ttEEtt.","..tttt..",".t.tt.t.","t..tt..t"],
+        pal:{".":null,"t":"#7a3aa0","E":"#ff4a4a"}},
+whirl :{px:["..www...",".w...w..","w..ww.w.","w.w..w.w","w.w.ww.w",".w....w.","..wwww..","........"],
+        pal:{".":null,"w":"#7fd9ff"}},
+cave  :{px:["........","..aaaa..",".aaaaaa.","aaa00aaa","aa0000aa","aa0000aa","aaaaaaaa","........"],
+        pal:{".":"#2e9a2e","a":"#8a8a8a","0":"#0a0a0a"}},
+dwall :{px:["bbbbbbbb","b...b...","bbbbbbbb","..b...b.","bbbbbbbb","b...b...","bbbbbbbb","..b...b."],
+        pal:{".":"#3a3128","b":"#1f1a12"}},
+dfloor:{px:["........","..d.....","......d.","........",".d......","....d...","........","......d."],
+        pal:{".":"#4a4238","d":"#3a3328"}},
+laddu :{px:[".l....l.",".llllll.",".l....l.",".l....l.",".llllll.",".l....l.",".llllll.",".l....l."],
+        pal:{".":"#4a4238","l":"#d8a018"}},
+laddd :{px:[".l....l.",".llllll.",".l....l.",".l....l.",".llllll.",".l....l.",".llllll.",".l....l."],
+        pal:{".":"#000000","l":"#9a7212"}},
+lair  :{px:["...aa...","..aaaa..",".aaaaaa.","aaa00aaa","aa0rr0aa","aa0rr0aa","aaaaaaaa","aa.aa.aa"],
+        pal:{".":"#555","a":"#8a8a8a","0":"#0a0a0a","r":"#ff5a1e"}},
+fire  :{px:["........","...r....",".r.ro...","..rro.r.",".rooor..",".royyo..","royyyyo.",".oooooo."],
+        pal:{".":"#140a06","r":"#c8341e","o":"#ff7a1e","y":"#ffd23a"}},
+fire2 :{px:["........","....r...","..or.r..",".r.orr..","..rooro.","..oyyor.",".oyyyyor",".oooooo."],
+        pal:{".":"#140a06","r":"#c8341e","o":"#ff7a1e","y":"#ffd23a"}},
+drake :{px:["........",".g...g..",".gg.gg..","..ggg...",".ggggg..","g.geg.g.","..g.g...","........"],
+        pal:{".":null,"g":"#7ac83a","e":"#ff4a4a"}},
+dragon:{px:["r......r","rr....rr",".rrrrrr.","rrRRRRrr","rRyRRyRr",".rrrrrr.","..rrrr..",".rr..rr."],
+        pal:{".":null,"r":"#a82222","R":"#e84a2a","y":"#ffd23a"}},
+};
+// humanoid variants
+function humanoid(h,f,b,l){return {px:HUMAN, pal:{".":null,"h":h,"f":f,"b":b,"l":l}};}
+SPR.player  = humanoid("#f2c896","#3a2a1a","#e8e8f4","#6fa8ff");
+SPR.lord    = humanoid("#ffd24a","#3a2a1a","#8a3ab0","#ffd24a");
+SPR.guard   = humanoid("#c8c8d8","#3a2a1a","#a83232","#7a7a8a");
+SPR.merchant= humanoid("#f2c896","#3a2a1a","#3f8a3f","#6b3f1c");
+SPR.healer  = humanoid("#f2c896","#3a2a1a","#e8e8e8","#e8e8e8");
+SPR.beggar  = humanoid("#d8b088","#3a2a1a","#6b5a3a","#4a3a22");
+SPR.mage    = humanoid("#e0e0ff","#3a2a1a","#2a4ac8","#2a4ac8");
+SPR.bard    = humanoid("#f2c896","#3a2a1a","#d89a2a","#8a3ab0");
+SPR.jester  = humanoid("#f2c896","#3a2a1a","#c83a8a","#3fae3f");
+SPR.orc     = humanoid("#4a8a2a","#1a0a0a","#5e4a2e","#3a2a1a");
+SPR.skeleton= humanoid("#e8e8e0","#000000","#d8d8cc","#c8c8bc");
+SPR.troll   = humanoid("#3a7a5a","#1a0a0a","#2e5e46","#24483a");
+SPR.ghost   = humanoid("#cfd8ff","#8a94c8","#b8c2ee","#9aa4d8");
+SPR.pirate  = humanoid("#d8a878","#1a0a0a","#3a3a3a","#8a2a2a");
+SPR.lich    = humanoid("#d8ffd8","#0a1a0a","#2a3a2a","#1a2a1a");
+SPR.cultist = humanoid("#e8d8c8","#1a0a0a","#5a1a2a","#3a0a1a");
+SPR.shadow  = humanoid("#3a3a4e","#0a0a14","#2a2a3e","#1a1a2e");
+
+// bake sprites to offscreen canvases
+const SPRC = {};
+for(const k in SPR){
+  const c=document.createElement("canvas"); c.width=TILE; c.height=TILE;
+  const g=c.getContext("2d"); const {px,pal}=SPR[k];
+  for(let y=0;y<8;y++)for(let x=0;x<8;x++){
+    const col=pal[px[y][x]];
+    if(col){g.fillStyle=col; g.fillRect(x*4,y*4,4,4);}
+  }
+  SPRC[k]=c;
+}
+
+// moongates: a Time-Bandits-style doorway of light that rises out of the
+// ground and sinks back with the moons — 3 heights x 2 shimmer frames
+function bakeGate(key,hFrac,cols,frame){
+  const c=document.createElement("canvas"); c.width=TILE; c.height=TILE;
+  const g=c.getContext("2d");
+  const h=Math.max(4,Math.round(TILE*hFrac));
+  const y0=TILE-h, x0=8, w=16;
+  g.fillStyle=cols.base; g.fillRect(x0,y0,w,h);
+  for(let x=0;x<w/4;x++)for(let y=0;y<h/4;y++){
+    const px=x0+x*4, py=y0+y*4;
+    if((x+y+frame)%3===0){ g.fillStyle=cols.streak; g.fillRect(px,py,4,4); }
+    else if((x*2+y+frame*3)%7===0){ g.fillStyle=cols.spark; g.fillRect(px+1,py+1,2,2); }
+  }
+  // a soft glow at the foot of the door
+  g.fillStyle=cols.streak; g.fillRect(x0-2,TILE-3,w+4,3);
+  SPRC[key]=c;
+}
+{
+  const BLUE={base:"#1e4fd9",streak:"#5fd9ff",spark:"#e8faff"};
+  const RED ={base:"#3a0a1a",streak:"#d84a6a",spark:"#ff9ab0"};
+  const HEIGHTS=[.3,.65,1];
+  HEIGHTS.forEach((f,i)=>{ for(const fr of [0,1]){
+    bakeGate(`gate${i}f${fr}`,f,BLUE,fr);
+    bakeGate(`dgate${i}f${fr}`,f,RED,fr);
+  }});
+}
+
+//---------------------------------------------------------------
+// 3. Terrain + world generation
+//---------------------------------------------------------------
+const T = { DEEP:0, WATER:1, SAND:2, GRASS:3, FOREST:4, HILLS:5, MOUNT:6, SWAMP:7,
+            TOWN:8, CASTLE:9, SHRINE:10, RUINS:11,
+            FLOOR:12, WALL:13, DOOR:14, COUNTER:15, THRONE:16,
+            DENT:17, DFLOOR:18, DWALL:19, LADDU:20, LADDD:21, LAIR:22, FIRE:23 };
+const TSPR = {
+  [T.DEEP]:["deep","deep"], [T.WATER]:["water","water2"], [T.SAND]:["sand","sand"],
+  [T.GRASS]:["grass","grass2"], [T.FOREST]:["forest","forest"], [T.HILLS]:["hills","hills"],
+  [T.MOUNT]:["mount","mount"], [T.SWAMP]:["swamp","swamp"], [T.TOWN]:["town","town"],
+  [T.CASTLE]:["castle","castle"], [T.SHRINE]:["shrine","shrine"], [T.RUINS]:["ruins","ruins"],
+  [T.FLOOR]:["floor","floor"], [T.WALL]:["wall","wall"], [T.DOOR]:["door","door"],
+  [T.COUNTER]:["counter","counter"], [T.THRONE]:["throne","throne"],
+  [T.DENT]:["cave","cave"], [T.DFLOOR]:["dfloor","dfloor"], [T.DWALL]:["dwall","dwall"],
+  [T.LADDU]:["laddu","laddu"], [T.LADDD]:["laddd","laddd"],
+  [T.LAIR]:["lair","lair"], [T.FIRE]:["fire","fire2"],
+};
+const WALK_LAND  = new Set([T.SAND,T.GRASS,T.FOREST,T.HILLS,T.SWAMP,T.TOWN,T.CASTLE,T.SHRINE,T.RUINS,T.FLOOR,T.DOOR,T.DENT,T.LAIR]);
+const WALK_SHIP  = new Set([T.DEEP,T.WATER]);
+
+const W=96, H=96;
+let world = new Uint8Array(W*H);
+
+function genWorld(){
+  rng = mulberry32(WORLD_SEED);
+  // value-noise fBm
+  const lat=(n)=>{const g=[];for(let i=0;i<n*n;i++)g.push(rng());return g;};
+  const oct=[{g:lat(7),s:6/96},{g:lat(13),s:12/96},{g:lat(25),s:24/96}];
+  const sample=(g,n,x,y)=>{
+    const fx=x*(n-1), fy=y*(n-1);
+    const x0=Math.floor(fx), y0=Math.floor(fy);
+    const x1=Math.min(x0+1,n-1), y1=Math.min(y0+1,n-1);
+    const tx=fx-x0, ty=fy-y0;
+    const a=g[y0*n+x0]*(1-tx)+g[y0*n+x1]*tx;
+    const b=g[y1*n+x0]*(1-tx)+g[y1*n+x1]*tx;
+    return a*(1-ty)+b*ty;
+  };
+  for(let y=0;y<H;y++)for(let x=0;x<W;x++){
+    const nx=x/W, ny=y/H;
+    let e = .55*sample(oct[0].g,7,nx,ny) + .3*sample(oct[1].g,13,nx,ny) + .15*sample(oct[2].g,25,nx,ny);
+    // radial falloff: ocean at edges
+    const dx=nx-.5, dy=ny-.5;
+    e -= Math.pow(Math.sqrt(dx*dx+dy*dy)*2,2.2)*.55;
+    let t;
+    if(e<.22) t=T.DEEP; else if(e<.34) t=T.WATER; else if(e<.38) t=T.SAND;
+    else if(e<.55) t=T.GRASS; else if(e<.66) t=T.FOREST; else if(e<.74) t=T.HILLS; else t=T.MOUNT;
+    world[y*W+x]=t;
+  }
+  // swamp patches on low grass
+  for(let i=0;i<26;i++){
+    let x=Math.floor(rng()*W), y=Math.floor(rng()*H);
+    if(world[y*W+x]!==T.GRASS) continue;
+    for(let j=0;j<12;j++){
+      const sx=clamp(x+Math.floor(rng()*5)-2,1,W-2), sy=clamp(y+Math.floor(rng()*5)-2,1,H-2);
+      if(world[sy*W+sx]===T.GRASS) world[sy*W+sx]=T.SWAMP;
+    }
+  }
+}
+const gw=(x,y)=> (x<0||y<0||x>=W||y>=H)?T.DEEP:world[y*W+x];
+const sw=(x,y,t)=>{world[y*W+x]=t;};
+
+// find land spots for locations (deterministic)
+function landSpots(count,minDist,avoid){
+  const spots=[];
+  let md=minDist, tries=0;
+  while(spots.length<count){
+    if(++tries>4000){ tries=0; md-=2; if(md<3) break; } // relax spacing if the land is crowded
+    const x=8+Math.floor(rng()*(W-16)), y=8+Math.floor(rng()*(H-16));
+    if(gw(x,y)!==T.GRASS && gw(x,y)!==T.FOREST) continue;
+    let ok=true;
+    for(const s of spots.concat(avoid||[]))
+      if((s.x-x)**2+(s.y-y)**2 < md*md){ok=false;break;}
+    if(ok) spots.push({x,y});
+  }
+  return spots;
+}
+
+genWorld();
+// castle: land nearest world centre
+let CASTLE={x:0,y:0};{
+  let best=1e9;
+  for(let y=20;y<H-20;y++)for(let x=20;x<W-20;x++){
+    if(gw(x,y)!==T.GRASS) continue;
+    const d=(x-W/2)**2+(y-H/2)**2;
+    if(d<best){best=d;CASTLE={x,y};}
+  }
+}
+const TOWNS   = landSpots(2,18,[CASTLE]);
+const SHRINES = landSpots(8,11,[CASTLE,...TOWNS]);
+const GATES   = landSpots(3,22,[CASTLE,...TOWNS,...SHRINES]);
+const VIRTUES = ["Honesty","Compassion","Valor","Justice","Sacrifice","Honor","Spirituality","Humility"];
+const MANTRAS = ["AHT","MIR","KOR","LEX","DON","SUL","OM","MEK"];
+
+// stamp locations (clear a walkable ring around each)
+function stampClear(x,y){
+  for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
+    const t=gw(x+dx,y+dy);
+    if(t===T.MOUNT||t===T.WATER||t===T.DEEP||t===T.SWAMP) sw(x+dx,y+dy,T.GRASS);
+  }
+}
+stampClear(CASTLE.x,CASTLE.y); sw(CASTLE.x,CASTLE.y,T.CASTLE);
+TOWNS.forEach(t=>{stampClear(t.x,t.y); sw(t.x,t.y,T.TOWN);});
+SHRINES.forEach(s=>{stampClear(s.x,s.y); sw(s.x,s.y,T.SHRINE);});
+GATES.forEach(g=>{stampClear(g.x,g.y);});
+const DUNNAMES=["Gloom","Vex","Maw","Hollow"];
+const DUNGEONS = landSpots(4,14,[CASTLE,...TOWNS,...SHRINES,...GATES])
+                 .map((s,i)=>({x:s.x,y:s.y,name:DUNNAMES[i]||"the Pit"}));
+DUNGEONS.forEach(d=>{stampClear(d.x,d.y); sw(d.x,d.y,T.DENT);});
+
+// ---- islands: land only a ship can reach ----
+function oceanSpot(clearR,minD,avoid){
+  for(let t=0;t<9000;t++){
+    const x=6+Math.floor(rng()*(W-12)), y=6+Math.floor(rng()*(H-12));
+    if(gw(x,y)!==T.DEEP && gw(x,y)!==T.WATER) continue;
+    let ok=true;
+    for(let oy=-clearR;ok&&oy<=clearR;oy++)for(let ox=-clearR;ox<=clearR;ox++){
+      const tt=gw(x+ox,y+oy);
+      if(tt!==T.DEEP && tt!==T.WATER){ok=false;break;}
+    }
+    if(ok) for(const a of avoid) if((a.x-x)**2+(a.y-y)**2<minD*minD){ok=false;break;}
+    if(ok) return {x,y};
+  }
+  return null;
+}
+function stampIsland(cx,cy,r){
+  for(let oy=-r;oy<=r;oy++)for(let ox=-r;ox<=r;ox++){
+    const d=Math.sqrt(ox*ox+oy*oy);
+    if(d>r) continue;
+    sw(cx+ox,cy+oy, d<=r-1.3 ? (rng()<.2?T.FOREST:T.GRASS) : T.SAND);
+  }
+}
+let BARROW=null;   // the Silver Barrow — sealed until the Barrow King's key
+const ISLES=[];
+{
+  const spec=[{r:4,kind:"town"},
+              {r:3,kind:"dun",name:"Gilt"},{r:3,kind:"dun",name:"Wrack"},
+              {r:2,kind:"shrine"}];
+  for(const s of spec){
+    const p=oceanSpot(s.r+3,16,[CASTLE,...ISLES]);
+    if(!p) continue;
+    stampIsland(p.x,p.y,s.r);
+    ISLES.push(p);
+    if(s.kind==="town"){ sw(p.x,p.y,T.TOWN); TOWNS.push({x:p.x,y:p.y}); }
+    else if(s.kind==="dun"){ sw(p.x,p.y,T.DENT); DUNGEONS.push({x:p.x,y:p.y,name:s.name}); }
+    else if(s.kind==="shrine"){    // the Shrine of Humility stands alone at sea
+      const old=SHRINES[7];
+      sw(old.x,old.y,T.GRASS);
+      SHRINES[7]={x:p.x,y:p.y};
+      sw(p.x,p.y,T.SHRINE);
+    }
+  }
+}
+BARROW = landSpots(1,10,[CASTLE,...TOWNS,...SHRINES,...GATES,...DUNGEONS])[0]
+         || {x:CASTLE.x+6,y:CASTLE.y+6};
+stampClear(BARROW.x,BARROW.y); sw(BARROW.x,BARROW.y,T.RUINS);
+// VARKUL's lair, in the far mountains — must border land walkable from the castle
+let LAIR=null;
+{
+  const reach=new Set([CASTLE.x+","+CASTLE.y]);
+  const q=[[CASTLE.x,CASTLE.y]];
+  while(q.length){
+    const[x,y]=q.pop();
+    for(const[dx,dy]of Object.values(DIRS)){
+      const nx=x+dx, ny=y+dy, k=nx+","+ny;
+      if(!reach.has(k) && WALK_LAND.has(gw(nx,ny))){ reach.add(k); q.push([nx,ny]); }
+    }
+  }
+  for(let t=0;t<9000 && !LAIR;t++){
+    const x=8+Math.floor(rng()*(W-16)), y=8+Math.floor(rng()*(H-16));
+    if(gw(x,y)!==T.MOUNT) continue;
+    if((x-CASTLE.x)**2+(y-CASTLE.y)**2<=700) continue;
+    if(Object.values(DIRS).some(([dx,dy])=>reach.has((x+dx)+","+(y+dy)))) LAIR={x,y};
+  }
+  if(!LAIR) LAIR={x:CASTLE.x+8,y:CASTLE.y+8};
+  stampClear(LAIR.x,LAIR.y); sw(LAIR.x,LAIR.y,T.LAIR);
+}
+
+// a ship moored near the castle's coast
+let shipStart=null;{
+  outer:
+  for(let r=2;r<40;r++)for(let dy=-r;dy<=r;dy++)for(let dx=-r;dx<=r;dx++){
+    const x=CASTLE.x+dx,y=CASTLE.y+dy;
+    if(gw(x,y)!==T.WATER) continue;
+    for(const d of Object.values(DIRS))
+      if(WALK_LAND.has(gw(x+d[0],y+d[1]))){shipStart={x,y};break outer;}
+  }
+}
+
+//---------------------------------------------------------------
+// 4. Interior maps (castle & towns) — hand-authored
+//  legend: #wall .floor D door g grass(exit) t tree ~water
+//          C counter  R throne  digits = NPC spawn markers
+//---------------------------------------------------------------
+function padMap(rows){
+  const w=Math.max(...rows.map(r=>r.length));
+  return rows.map(r=>r.padEnd(w,"g"));
+}
+const LOCS = {
+castle:{
+  name:"Castle Lumen",
+  map:padMap([
+  "ggggggggggggggggggggg",
+  "g###################g",
+  "g#........#........#g",
+  "g#.R1.....#...C....#g",
+  "g#........D..2.....#g",
+  "g#........#........#g",
+  "g#####D########D####g",
+  "g#.................#g",
+  "g#..3.........4....#g",
+  "g#.................#g",
+  "g#.....5...........#g",
+  "g#########D#########g",
+  "gggggggggg@gggggggggg",
+  "ggggggggggggggggggggg",
+  ]),
+  npcs:{
+   "1":{name:"Lord Lumen",spr:"lord",peace:true,
+     greet:"Thou standest before Lord Lumen, keeper of Albion.",
+     lines:{
+      job:"I watch over Albion, and I await the Saint.",
+      quest:"Master the Eight Virtues! Do good deeds, then meditate at the eight shrines scattered across the land. Speak the proper MANTRA at each. When all eight virtues burn bright within thee, thou shalt be the Saint.",
+      virtue:"Honesty, Compassion, Valor, Justice, Sacrifice, Honor, Spirituality, Humility. Seek the sages and bards — they know the mantras.",
+      mantra:"I know only one: the mantra of Spirituality is OM. Seek others in the towns.",
+      shrine:"Eight white shrines stand in the wilds. Stand upon one and Meditate.",
+      heal:()=>{P.hp=P.maxhp; msg("\"Let thy wounds be mended.\" Lord Lumen heals thee!","m-good"); sfx.virtue();},
+      saint:"Only deeds make a Saint. Words are wind.",
+     }},
+   "2":{name:"Cedric the Cook",spr:"merchant",peace:true,
+     greet:"A sweating cook stirs a great pot.",
+     lines:{ job:"I feed the whole castle! Say BUY if thou art hungry.",
+       mantra:"Mantras? I know recipes. The bard in Moonhaven knows songs and secrets.",
+       buy:{shop:"food"} }},
+   "3":{name:"Sir Gareth",spr:"guard",peace:true,
+     greet:"A guard in crimson stands at attention.",
+     lines:{ job:"I guard Lord Lumen with my life.",
+       valor:"Valor is not slaying — it is not fleeing. Stand thy ground! Its mantra is KOR.",
+       mantra:"The mantra of Valor is KOR. Sages know more.",
+       monster:"Orcs and trolls plague the roads. Serpents rule the deep.",
+       dungeon:"Four pits scar the land — Gloom, Vex, Maw and Hollow. Bring a stout blade and a lantern's courage." }},
+   "4":{name:"Mirren the Seer",spr:"mage",peace:true,
+     greet:"A robed seer studies a glowing orb.",
+     lines:{ job:"I read the moons and the gates they open.",
+       moon:"Three moongates stand in the wild. As the moons turn, one doorway of light rises from the earth — step through and be carried to the next.",
+       gate:"The blue doors rise and sink with the moons. Watch the MOONS panel.",
+       curse:"When the moons darken, a gate sticks open and burns red — and the dead walk out of it. Someone must go IN.",
+       dead:"Bone and shade serve the Barrow King beyond the corrupted gate. Steel and spirit send them back.",
+       barrow:"The Silver Barrow was sealed before the castle's first stone. The Barrow King took its key into death with him.",
+       silver:"A silver lock, a silver key — and within, they say, a blade quenched in moonlight.",
+       mantra:"The mantra of Humility, MEK, is whispered by the jester of Ironfast.",
+       spell:"Magic left this land with the old shrines. Only virtue remains." }},
+   "5":{name:"Pip the Page",spr:"bard",peace:true,
+     greet:"A small page bows deeply.",
+     lines:{ job:"I run messages! And I listen at doors.",
+       secret:"The healer of Moonhaven takes blood for the poor — a true Sacrifice.",
+       traitor:()=>msg(P.plot&&!P.plotDone
+         ? '"Last midnight I saw two shadows by the vault... and heard KEYS. Look for stolen vault keys at their belts!"'
+         : '"Traitors? In OUR castle? ...I did once hear rats in the vault, though."',"m-say"),
+       mantra:"I heard the mantra of Sacrifice is DON!" }},
+  }},
+town0:{
+  name:"Moonhaven",
+  map:padMap([
+  "ggggggggggggggggg",
+  "g#######,#######g",
+  "g#.....#,#.....#g",
+  "g#..1..D,D..2..#g",
+  "g#.....#,#.....#g",
+  "g###D###,###D###g",
+  "g,,,,,,,,,,,,,,,g",
+  "g@,,,,,,3,,,,,,,g",
+  "g###D###,###D###g",
+  "g#.....#,#.....#g",
+  "g#..4..#,#..5..#g",
+  "g#.....#,#.....#g",
+  "g#######,#######g",
+  "ggggggggggggggggg",
+  ]),
+  npcs:{
+   "1":{name:"Mother Ana",spr:"healer",peace:true,
+     greet:"A healer in white smiles kindly.",
+     lines:{ job:"I mend the sick. Say HEAL (30g) or CURE poison (20g). Or GIVE blood for the poor.",
+       heal:()=>{ if(P.gold<30) return msg("\"Thou lackest the gold, child.\"","m-sys");
+         P.gold-=30; P.hp=P.maxhp; msg("Thy wounds close. Thou art healed!","m-good"); sfx.virtue(); },
+       cure:()=>{ if(!P.poison) return msg("\"No venom runs in thee.\"","m-sys");
+         if(P.gold<20) return msg("\"Thou lackest the gold, child.\"","m-sys");
+         P.gold-=20; P.poison=false; msg("The venom is drawn out. Thou art cured!","m-good"); },
+       give:()=>{ if(P.hp<=12) return msg("\"Thou art too weak to give blood.\"","m-sys");
+         P.hp-=10; virtue(4,5,"Thy blood will save another."); },
+       mantra:"Sacrifice asks all and promises naught. Its mantra is DON." }},
+   "2":{name:"Old Tam",spr:"beggar",peace:true,
+     greet:"A ragged beggar holds out a wooden bowl.",
+     lines:{ job:"I beg, milord. The winters are cruel. Couldst thou GIVE a coin?",
+       give:()=>{ if(P.gold<1) return msg("Thou hast nothing to give.","m-sys");
+         const amt=Math.min(P.gold,ri(1,3)); P.gold-=amt;
+         if(P.almsT===undefined || turns-P.almsT>=100){ P.almsT=turns; virtue(1,3,`Old Tam blesses thee for ${amt} gold.`); }
+         else msg(`Old Tam thanks thee for ${amt} gold. (Charity given freely, not for reward, needs time to weigh.)`,"m-say"); },
+       mantra:"Compassion's mantra is MIR — even a beggar knows mercy." }},
+   "3":{name:"Lyra the Bard",spr:"bard",peace:true,
+     greet:"A bard strums a lute in the square.",
+     lines:{ job:"I sing the old songs — of virtues, mantras, and moons.",
+       song:"~ Eight lights, one soul; speak true and be whole... ~",
+       mantra:"Listen well: Honesty is AHT, Compassion MIR, Justice LEX. Ask the sage of Ironfast for the rest.",
+       honesty:"Honesty is AHT. When a merchant errs in thy favor... what wilt thou do?",
+       moon:"The seer of the castle reads the moongates." }},
+   "4":{name:"Marla the Grocer",spr:"merchant",peace:true,
+     greet:"Shelves of bread and salted meat line the walls.",
+     lines:{ job:"Provisions! Say BUY. An army marches on its stomach and so dost thou. ...And say RATS if thou wouldst hear my plea.",
+       buy:{shop:"food"},
+       rats:{ask:"\"Beasts gnaw my stores below! Wilt thou clear my cellar?\" (Y/N)",
+             yes:()=>{ if(P.ratsDone) return msg('"Bless thee — \'tis already done! My hero."',"m-say");
+                       startRaid("cellar","rats"); },
+             no :()=>msg('"Then I hope thou likest thy bread pre-nibbled."',"m-say")} }},
+   "5":{name:"Brother Sile",spr:"mage",peace:true,
+     greet:"A quiet monk kneels in prayer.",
+     lines:{ job:"I pray for us all.",
+       pray:"Spirituality binds the other seven. Its mantra is OM.",
+       mantra:"OM. Breathe it at the shrine of Spirituality.",
+       shrine:"The shrines are marked as white steps upon thy map." }},
+  }},
+town1:{
+  name:"Ironfast",
+  map:padMap([
+  "ggggggggggggggggg",
+  "g#######,#######g",
+  "g#..C..#,#.....#g",
+  "g#..1..D,D..2..#g",
+  "g#.....#,#.....#g",
+  "g###D###,###D###g",
+  "g,,,,,,,,,,,,,,,g",
+  "g@,,,,,,3,,,,,,,g",
+  "g###D###,###D###g",
+  "g#.....#,#.....#g",
+  "g#..4..#,#..5..#g",
+  "g#..C..#,#.....#g",
+  "g#######,#######g",
+  "ggggggggggggggggg",
+  ]),
+  npcs:{
+   "1":{name:"Grimm the Smith",spr:"merchant",peace:true,
+     greet:"The forge roars. A soot-black smith looks up.",
+     lines:{ job:"Steel for coin! Say BUY for weapons.",
+       buy:{shop:"weapons"} }},
+   "2":{name:"Sage Wystan",spr:"mage",peace:true,
+     greet:"An ancient sage peers over a mountain of scrolls.",
+     lines:{ job:"I remember what the land forgets.",
+       mantra:"Write these true: Valor is KOR, Sacrifice DON, Honor SUL. The bard of Moonhaven and the jester here know the rest.",
+       honor:"Honor is keeping the code when none watch. Meditate with SUL.",
+       barrow:"Seek the Silver Barrow among the wilds — pale stones, sealed by silver. What sleeps there is owed to the worthy.",
+       dragon:"VARKUL sleeps beneath the peaks, coiled on a hundred years of gold. Pray he never wakes — and arm well in case he does.",
+       cult:"A shadow-cult despises the shrines. They strike where virtue runs weakest — tend thy failings, or fight for them.",
+       virtue:"Each deed weighs. The shrines only reveal what thou already art.",
+       saint:"When all eight virtues shine near-full, the Saint awakens." }},
+   "3":{name:"Foolish Fenn",spr:"jester",peace:true,
+     greet:"A jester cartwheels past, bells jangling.",
+     lines:{ job:"I mock the mighty! Riddle me: art thou the greatest hero this land hath ever seen?",
+       riddle:{ask:"\"Art thou the greatest hero this land hath ever seen?\" (Y/N)",
+               yes:()=>virtue(7,-5,"\"HA! Pride goeth before the fall!\" Fenn capers away."),
+               no :()=>virtue(7,5,"\"Wisely spoken!\" Fenn bows low.")},
+       mantra:{ask:"\"The mantra of Humility for a straight answer! Art thou the greatest hero this land hath ever seen?\" (Y/N)",
+               yes:()=>virtue(7,-5,"\"HA! Then thou needest it not, o mighty one!\""),
+               no :()=>{virtue(7,5,"\"Then thou art ready: the mantra is MEK.\"");}} }},
+   "4":{name:"Hilda the Armorer",spr:"merchant",peace:true,
+     greet:"Racks of armor gleam in lamplight.",
+     lines:{ job:"Say BUY, and walk out safer than thou walked in.",
+       buy:{shop:"armor"} }},
+   "5":{name:"Captain Roke",spr:"guard",peace:true,
+     greet:"A scarred captain sharpens her blade.",
+     lines:{ job:"I keep Ironfast's peace. Draw steel on the innocent and answer to Justice.",
+       justice:"Justice is LEX. Harm none who harm none.",
+       mantra:"LEX, for Justice.",
+       siege:"When pirate reavers besiege a town, the guard cannot hold alone. Go thyself — and quickly.",
+       ship:"A ship lies moored near the castle coast. Board it — the sea hides shrines.",
+       pirate:"Pirate sails prowl the deep. Sink one gently and her crew will strike colors — then she is thine.",
+       dungeon:"Treasure sleeps at the bottom of the dungeons. So do trolls. Plan accordingly.",
+       treasure:"The deepest vaults of the dungeons hold gold — and honor for those who reach them." }},
+  }},
+town2:{
+  name:"Skullhaven",
+  map:padMap([
+  "ggggggggggggggggg",
+  "g#######,#######g",
+  "g#..C..#,#.....#g",
+  "g#..1..D,D..2..#g",
+  "g#.....#,#..C..#g",
+  "g###D###,###D###g",
+  "g,,,,,,,,,,,,,,,g",
+  "g@,,,,,,3,,,,,,,g",
+  "g###D###,###D###g",
+  "g#.....#,#.....#g",
+  "g#..4..#,#..5..#g",
+  "g#.....#,#.....#g",
+  "g#######,#######g",
+  "ggggggggggggggggg",
+  ]),
+  npcs:{
+   "1":{name:"Mad Meg",spr:"merchant",peace:true,
+     greet:"A wild-haired tavern keeper slams a mug on the counter.",
+     lines:{ job:"Rum and salt pork for them what pays! Say BUY.",
+       buy:{shop:"food"},
+       rum:"Rum's off. Drank it meself.",
+       pirate:"Everyone here's a pirate, love. Even the rats." }},
+   "2":{name:"One-Eyed Silas",spr:"pirate",peace:true,
+     greet:"A one-eyed fence eyes thee from behind a counter of... acquired goods.",
+     lines:{ job:"I buy and sell what falls off ships. Say BUY — cheap, no questions.",
+       buy:{shop:"fence"},
+       steal:"Stolen? STOLEN? ...aye, stolen." }},
+   "3":{name:"Pirate King Rafe",spr:"pirate",peace:true,
+     greet:"A man in a ragged crown lounges on a barrel throne.",
+     lines:{ job:"King of Skullhaven! King of the free seas!",
+       pirate:"My captains answer to none — sink them if thou darest, and take what floats.",
+       whirl:"The whirlpool? She's older than the moons, boy. She takes ships where SHE pleases.",
+       kraken:"The kraken took three of my fleet last winter. Steer wide of the deep water, or feed it.",
+       treasure:"Gilt and Wrack — two lonely isles ringed in sand. Their caves go deep and their bottoms glitter.",
+       virtue:"Virtue? HAR! Keep thy halo dim in my harbor, saint — Skullhaven eats the shiny ones.",
+       raid:"Cross us — or worse, come here glowing with righteousness — and my lads will greet thee with steel.",
+       siege:"Aye, my captains stretch their legs on the mainland now and again. Stop them if thou canst. HAR!",
+       captain:"Blackmaw, Iron Bess, Red Roderick... each worse than the last. Pray thou never meetest Old Hexhand.",
+       mantra:"Mantras are for monks. But the monks DO say humility lives on a wee island all its own..." }},
+   "4":{name:"Scab the Cabin Boy",spr:"bard",peace:true,
+     greet:"A scrawny cabin boy polishes a boot that fits no one here.",
+     lines:{ job:"I swab, I scrub, I listen.",
+       secret:"The King snores. Also: the fence waters the rum AND the armor.",
+       treasure:"Gilt and Wrack, the treasure isles! Deep caves, heavy chests. Take a strong hull.",
+       capture:"Sink a pirate ship gentle-like and her crew gives up — then she's YOURS to sail." }},
+   "5":{name:"Old Salt",spr:"guard",peace:true,
+     greet:"An ancient shipwright chews a nail thoughtfully.",
+     lines:{ job:"Hulls broke and hulls mended. Say REPAIR — thirty gold patches thy fleet.",
+       repair:()=>{
+         if(!ships.length) return msg("\"Thou hast no ship, lubber.\"","m-sys");
+         if(ships.every(s=>s.hull>=s.maxhull)) return msg("\"Thy hull is sound as stone already.\"","m-sys");
+         if(P.gold<30) return msg("\"No coin, no caulk.\"","m-sys");
+         P.gold-=30; ships.forEach(s=>s.hull=s.maxhull);
+         msg("Old Salt patches thy fleet good as new.","m-good"); sfx.gold();
+       },
+       whirl:"Hit the whirlpool once. Woke up half the sea away with me hat gone.",
+       hull:"A moored ship mends herself slow. Or pay me and sail NOW." }},
+  }},
+cellar:{
+  name:"Marla's Cellar",
+  map:padMap([
+  "#############",
+  "#..C......C.#",
+  "#...........#",
+  "#.C..C..C...#",
+  "#...........#",
+  "#..C.....C..#",
+  "#.....@.....#",
+  "######x######",
+  ]),
+  npcs:{}},
+shrinemap:{
+  name:"the Defiled Shrine",
+  map:padMap([
+  "ggggggggggggggg",
+  "g,,,,,,,,,,,,,g",
+  "g,,t,,,,,,,t,,g",
+  "g,,,,,,,,,,,,,g",
+  "g,,,,,,s,,,,,,g",
+  "g,,,,,,,,,,,,,g",
+  "g,,t,,,,,,,t,,g",
+  "g,,,,,,,,,,,,,g",
+  "g,,,,,,@,,,,,,g",
+  "g,,,,,,,,,,,,,g",
+  "ggggggggggggggg",
+  ]),
+  npcs:{}},
+lair:{
+  name:"VARKUL's Lair",
+  map:padMap([
+  "wwwwwwwwwwwwwwwwwww",
+  "wwwwwwwddddwwwwwwww",
+  "wwddddddddddddddwww",
+  "wwdddwwddddwwddddww",
+  "wdddddddddddddddddw",
+  "wdd$ddddddddddd$ddw",
+  "wdddddddddddddddddw",
+  "wdd$ddddddddddd$ddw",
+  "wwdddddddddddddddww",
+  "wwwddddddddddddwwww",
+  "wwwwwwdddddddwwwwww",
+  "wwwwwwwww@wwwwwwwww",
+  "wwwwwwwwwxwwwwwwwww",
+  ]),
+  npcs:{}},
+camp:{
+  name:"thy Camp",
+  map:padMap([
+  "ggggggggggggg",
+  "g,,,t,,,t,,,g",
+  "g,,,,,,,,,,,g",
+  "g,t,,,,,,,t,g",
+  "g,,,,F,,,,,,g",
+  "g,,,,@,,,,,,g",
+  "g,t,,,,,,,t,g",
+  "g,,,,,,,,,,,g",
+  "g,,,t,,,t,,,g",
+  "ggggggggggggg",
+  ]),
+  npcs:{}},
+deck:{
+  name:"the Pale Ship",
+  map:padMap([
+  "~~~~~~~~~~~~~~~",
+  "~~###########~~",
+  "~~#....$....#~~",
+  "~~#..C...C..#~~",
+  "~~#.........#~~",
+  "~~#..C.$.C..#~~",
+  "~~#....@....#~~",
+  "~~#####x#####~~",
+  "~~~~~~~~~~~~~~~",
+  ]),
+  npcs:{}},
+graveyard:{
+  name:"the Captains' Rest",
+  map:padMap([
+  "ggggggggggggggg",
+  "g,,r,,,,,,,r,,g",
+  "g,,,,,r,,,,,,,g",
+  "g,r,,,,,,,r,,,g",
+  "g,,,,r,,,,,,r,g",
+  "g,,,,,,,,,,,,,g",
+  "g,r,,,,r,,,r,,g",
+  "g,,,,,,,,,,,,,g",
+  "g,,,,,,@,,,,,,g",
+  "ggggggggggggggg",
+  ]),
+  npcs:{}},
+trial:{
+  name:"the Circle of Light",
+  map:padMap([
+  "wwwwwwwwwwwwwwwww",
+  "w...............w",
+  "w..w.........w..w",
+  "w...............w",
+  "w....w.....w....w",
+  "w.......s.......w",
+  "w....w.....w....w",
+  "w...............w",
+  "w..w.........w..w",
+  "w......@........w",
+  "wwwwwwwxwwwwwwwww",
+  ]),
+  npcs:{}},
+void:{
+  name:"the Hollow Moon",
+  map:padMap([
+  "ggggggggggggggggg",
+  "gwwwwwwwwwwwwwwwg",
+  "gwdddddddddddddwg",
+  "gwddwwdddddwwddwg",
+  "gwdddddddddddddwg",
+  "gwdddwdddddwdddwg",
+  "gwdddddddddddddwg",
+  "gwdddwdddddwdddwg",
+  "gwdddddddddddddwg",
+  "gwddwwdddddwwddwg",
+  "gwdddddd@ddddddwg",
+  "gwwwwwwwdwwwwwwwg",
+  "ggggggggggggggggg",
+  ]),
+  npcs:{}},
+};
+// map town index to LOC key
+const TOWN_KEYS=["town0","town1","town2"];
+
+//---------------------------------------------------------------
+// 5. Shops
+//---------------------------------------------------------------
+const WEAPONS=[
+  {name:"Hands", min:1,max:3, cost:0},
+  {name:"Dagger",min:1,max:6, cost:12},
+  {name:"Mace",  min:2,max:10,cost:60},
+  {name:"Sword", min:3,max:16,cost:180},
+  {name:"Halberd",min:5,max:24,cost:420},
+  {name:"Moonblade",min:8,max:30,cost:0},   // never sold — sleeps in the Silver Barrow
+];
+const ARMORS=[
+  {name:"Skin",   def:0, cost:0},
+  {name:"Cloth",  def:1, cost:24},
+  {name:"Leather",def:2, cost:90},
+  {name:"Chain",  def:4, cost:260},
+  {name:"Plate",  def:6, cost:560},
+  {name:"Dragonscale",def:8, cost:0},   // cut from VARKUL's own hide
+];
+const SHOPS={
+  food:{title:"PROVISIONS", items:[
+    {name:"25 Food", cost:12, buy:()=>{P.food+=25;}},
+    {name:"100 Food",cost:44, buy:()=>{P.food+=100;}}]},
+  weapons:{title:"WEAPONS", items: WEAPONS.slice(1,5).map((w,i)=>(
+    {name:`${w.name} (${w.min}-${w.max} dmg)`, cost:w.cost, buy:()=>{P.weapon=Math.max(P.weapon,i+1); }}))},
+  armor:{title:"ARMORY", items: ARMORS.slice(1,5).map((a,i)=>(
+    {name:`${a.name} (+${a.def} def)`, cost:a.cost, buy:()=>{P.armor=Math.max(P.armor,i+1); }}))},
+  fence:{title:"ACQUIRED GOODS", items:[
+    {name:"Sword (3-16 dmg)",   cost:100, buy:()=>{P.weapon=Math.max(P.weapon,3); virtue(0,-2,"Stolen steel, cheap and quiet.");}},
+    {name:"Halberd (5-24 dmg)", cost:250, buy:()=>{P.weapon=Math.max(P.weapon,4); virtue(0,-2,"No questions asked.");}},
+    {name:"Chain mail (+4 def)",cost:150, buy:()=>{P.armor=Math.max(P.armor,3);  virtue(0,-2,"Still smells of its last owner.");}},
+    {name:"Plate mail (+6 def)",cost:330, buy:()=>{P.armor=Math.max(P.armor,4);  virtue(0,-2,"A bargain soaked in blood.");}},
+  ]},
+};
+
+//---------------------------------------------------------------
+// 6. Monsters
+//---------------------------------------------------------------
+const MONST={
+  rat     :{name:"giant rat",  spr:"rat",     hp:8,  dmg:4,  ac:0, xp:6,  gold:[0,4],  water:false},
+  snake   :{name:"viper",      spr:"snake",   hp:10, dmg:5,  ac:0, xp:9,  gold:[0,5],  water:false, poison:true},
+  orc     :{name:"orc",        spr:"orc",     hp:14, dmg:7,  ac:1, xp:14, gold:[3,12], water:false},
+  skeleton:{name:"skeleton",   spr:"skeleton",hp:18, dmg:9,  ac:2, xp:20, gold:[4,16], water:false},
+  ghost   :{name:"ghost",      spr:"ghost",   hp:22, dmg:11, ac:3, xp:30, gold:[0,10], water:false, night:true},
+  troll   :{name:"troll",      spr:"troll",   hp:34, dmg:15, ac:3, xp:48, gold:[10,30],water:false},
+  serpent :{name:"sea serpent",spr:"serpent", hp:30, dmg:13, ac:2, xp:44, gold:[0,0],  water:true, ranged:2},
+  pirate  :{name:"brigand",    spr:"pirate",  hp:20, dmg:10, ac:2, xp:26, gold:[8,26], water:false},
+  pirateShip:{name:"pirate ship",spr:"pships",hp:40, dmg:12, ac:4, xp:44, gold:[20,60],water:true, ranged:3, capture:true},
+  kraken  :{name:"kraken",     spr:"kraken",  hp:46, dmg:18, ac:3, xp:64, gold:[0,0],  water:true},
+};
+function spawnTable(){
+  const lvl=P.level;
+  if(P.onShip){
+    const t=[["serpent",36],["pirateShip",40]];
+    if(lvl>=2) t.push(["kraken",20]);
+    if(lvl>=5) t.push(["kraken",15]);   // deep waters grow deadlier
+    return t;
+  }
+  const soft=Math.max(1,6-lvl);         // vermin fade as thou growest
+  const t=[["rat",6*soft],["snake",4*soft],["orc",26]];
+  if(lvl>=2) t.push(["skeleton",14+lvl*2],["pirate",10]);   // brigands prey on the seasoned
+  if(lvl>=3) t.push(["ghost",6+lvl*2],["troll",4+lvl*2]);
+  return t;
+}
+
+//---------------------------------------------------------------
+// 6b. Dungeons — rogue-style rooms & corridors, same top-down view
+//---------------------------------------------------------------
+const DW=40, DH=40, DLEV=3;
+function genDunLevel(di,lvl){
+  const rr=mulberry32((WORLD_SEED*31 + di*7919 + lvl*104729)|0);
+  const ri2=(a,b)=>a+Math.floor(rr()*(b-a+1));
+  const g=new Array(DW*DH).fill(T.DWALL);
+  const rooms=[];
+  for(let i=0;i<80 && rooms.length<9;i++){
+    const w=ri2(4,8), h=ri2(3,6), x=ri2(1,DW-w-2), y=ri2(1,DH-h-2);
+    if(rooms.some(r=>x<r.x+r.w+1 && r.x<x+w+1 && y<r.y+r.h+1 && r.y<y+h+1)) continue;
+    rooms.push({x,y,w,h,cx:x+(w>>1),cy:y+(h>>1)});
+  }
+  for(const r of rooms)
+    for(let yy=r.y;yy<r.y+r.h;yy++)for(let xx=r.x;xx<r.x+r.w;xx++) g[yy*DW+xx]=T.DFLOOR;
+  for(let i=1;i<rooms.length;i++){          // L-shaped corridors
+    const b=rooms[i]; let x=rooms[i-1].cx, y=rooms[i-1].cy;
+    while(x!==b.cx){ g[y*DW+x]=T.DFLOOR; x+=Math.sign(b.cx-x); }
+    while(y!==b.cy){ g[y*DW+x]=T.DFLOOR; y+=Math.sign(b.cy-y); }
+    g[y*DW+x]=T.DFLOOR;
+  }
+  const up={x:rooms[0].cx,y:rooms[0].cy};
+  g[up.y*DW+up.x]=T.LADDU;
+  const last=rooms[rooms.length-1];
+  let down=null; const lvChests=[];
+  if(lvl<DLEV-1){ down={x:last.cx,y:last.cy}; g[down.y*DW+down.x]=T.LADDD; }
+  else {                                     // deepest level: the hoard
+    const rich = di>=4 ? 2.5 : 1;            // treasure-isle dungeons pay far better
+    const spots=[[-1,0],[1,0],[0,-1],[0,1]];
+    for(const[ox,oy]of spots){
+      const cx2=last.cx+ox, cy2=last.cy+oy;
+      if(g[cy2*DW+cx2]===T.DFLOOR)
+        lvChests.push({x:cx2,y:cy2,gold:Math.round((60+Math.floor(rr()*90))*rich),honor:true});
+    }
+  }
+  const tables=[["rat","snake","orc"],["orc","skeleton","ghost"],["skeleton","ghost","troll"]];
+  const tbl=tables[Math.min(lvl,2)], mobs=[];
+  for(let k=0;k<7+lvl*3;k++){
+    const r=rooms[1+Math.floor(rr()*(rooms.length-1))];
+    const x=ri2(r.x,r.x+r.w-1), y=ri2(r.y,r.y+r.h-1);
+    if(g[y*DW+x]!==T.DFLOOR || mobs.some(m=>m.x===x&&m.y===y)) continue;
+    const key=tbl[Math.floor(rr()*tbl.length)], def=MONST[key];
+    mobs.push({key,name:def.name,spr:def.spr,x,y,hp:def.hp+lvl*4,dmg:def.dmg+lvl*2,
+               ac:def.ac,xp:def.xp+lvl*8,gold:[def.gold[0]+lvl*4,def.gold[1]+lvl*8],
+               water:false,poison:def.poison});
+  }
+  return {grid:g, mobs, chests:lvChests, up, down};
+}
+
+//---------------------------------------------------------------
+// 7. Game state
+//---------------------------------------------------------------
+let P=null, monsters=[], chests=[], mode="title", pending=null, ships=[], whirl=null, ghostShip=null;
+const curShip=()=> (P&&P.onShip)? ships[P.shipIdx] : null;
+let inLoc=null;   // {key, map(rows array), npcs:[{...,x,y}], w,h}
+let inDun=null;   // {idx, lvl, levels:{}, ret:{x,y}}
+let wMobs=null, wChests=null;   // world entities parked while in a dungeon
+let animF=0, turns=0;
+
+function enterDungeon(){
+  const di=DUNGEONS.findIndex(d=>d.x===P.x&&d.y===P.y);
+  if(di<0) return msg("There is nothing to enter here.","m-sys");
+  wMobs=monsters; wChests=chests;
+  inDun={idx:di, lvl:0, levels:{}, ret:{x:P.x,y:P.y}};
+  loadDunLevel(0,"up",true);
+  msg(`Thou descendest into the dungeon ${DUNGEONS[di].name}!`,"m-blue");
+  msg("(It is dark below. Bump foes to fight; E climbs ladders.)","m-sys");
+  render();
+}
+function loadDunLevel(lvl,at,first){
+  if(!first && inDun.levels[inDun.lvl]){
+    inDun.levels[inDun.lvl].mobs=monsters; inDun.levels[inDun.lvl].chests=chests;
+  }
+  if(!inDun.levels[lvl]) inDun.levels[lvl]=genDunLevel(inDun.idx,lvl);
+  const L=inDun.levels[lvl];
+  inDun.lvl=lvl; monsters=L.mobs; chests=L.chests;
+  const pos = at==="down" ? L.down : L.up;
+  P.x=pos.x; P.y=pos.y;
+}
+function exitDungeon(){
+  if(inDun.levels[inDun.lvl]){
+    inDun.levels[inDun.lvl].mobs=monsters; inDun.levels[inDun.lvl].chests=chests;
+  }
+  P.x=inDun.ret.x; P.y=inDun.ret.y;
+  monsters=wMobs||[]; chests=wChests||[]; wMobs=wChests=null; inDun=null;
+  msg("Thou emergest into the light of Albion.","m-blue");
+  render();
+}
+function dungeonLadder(){
+  const t=tileAt(P.x,P.y);
+  if(t===T.LADDD){
+    loadDunLevel(inDun.lvl+1,"up");
+    msg(`Thou climbest down to level ${inDun.lvl+1} of ${DUNGEONS[inDun.idx].name}.`,"m-blue");
+    sfx.gate(); render();
+  } else if(t===T.LADDU){
+    if(inDun.lvl===0){ exitDungeon(); return; }
+    loadDunLevel(inDun.lvl-1,"down");
+    msg(`Thou climbest up to level ${inDun.lvl+1}.`,"m-blue");
+    render();
+  } else msg("No ladder here.","m-sys");
+}
+
+function newGame(){
+  P={ x:CASTLE.x, y:CASTLE.y+2, hp:60, maxhp:60, level:1, xp:0,
+      gold:120, food:200, weapon:1, armor:1, poison:false, poisonT:0, onShip:false, shipIdx:-1,
+      virtues:[25,25,25,25,25,25,25,25], shrineSeen:0, avatar:false,
+      shrineCd:{}, honestyFlag:false, skullWrath:false, skullRespect:false,
+      pirateWar:0, siege:null, lastSiege:0, finalSiege:false, finalDone:false,
+      undeadWar:0, moonCurse:null, lastCurse:0, silverKey:false, barrowOpened:false,
+      ratsDone:false, desec:null, lastDesec:0, cultWar:0, dragonAwake:false, dragonSlain:false,
+      lastAmbush:0, lastGhost:0, risen:false, risenDone:false,
+      plot:null, plotDone:false, trialDone:false, trialHinted:false, trialNagged:false };
+  ghostShip=null;
+  // ensure start tile walkable
+  if(!WALK_LAND.has(gw(P.x,P.y))){ sw(P.x,P.y,T.GRASS); }
+  monsters=[]; chests=[]; inLoc=null; inDun=null; wMobs=wChests=null; turns=0;
+  ships = shipStart? [{x:shipStart.x,y:shipStart.y,hull:50,maxhull:50}] : [];
+  whirl=null;
+  for(let i=0;i<400;i++){          // seed the whirlpool in far deep water
+    const x=ri(4,W-5), y=ri(4,H-5);
+    if(gw(x,y)===T.DEEP && (x-CASTLE.x)**2+(y-CASTLE.y)**2>900){ whirl={x,y}; break; }
+  }
+  msg("Thou awakenest in a green field. A castle rises to the north.","m-blue");
+  msg("Seek Lord Lumen — press E at the castle, T to talk.","m-sys");
+}
+
+//---------------------------------------------------------------
+// 8. Messages / prompt UI
+//---------------------------------------------------------------
+const logEl=$("log"), promptEl=$("prompt"), tin=$("tin"), ppfx=$("ppfx");
+const LOG=[];
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+function msg(text,cls="m-say"){
+  LOG.push({text,cls});
+  while(LOG.length>7) LOG.shift();
+  logEl.innerHTML = LOG.map(l=>`<div class="${l.cls}">${esc(l.text)}</div>`).join("");
+}
+function openPrompt(prefix,cb){
+  mode="text"; pending={cb};
+  ppfx.textContent=prefix;
+  promptEl.classList.add("on");
+  tin.value=""; setTimeout(()=>tin.focus(),0);
+}
+function closePrompt(){
+  promptEl.classList.remove("on");
+  tin.blur(); mode="play"; pending=null;
+}
+tin.addEventListener("keydown",e=>{
+  e.stopPropagation();
+  if(e.key==="Enter"){
+    const v=tin.value.trim(); const cb=pending&&pending.cb;
+    closePrompt();
+    if(cb) cb(v);
+  } else if(e.key==="Escape"){
+    closePrompt();
+    if(P) P.honestyFlag=false;   // an escaped merchant-change prompt must not jam the event forever
+    msg("...","m-sys"); render();
+  }
+});
+
+//---------------------------------------------------------------
+// 9. Virtues
+//---------------------------------------------------------------
+function virtue(i,amt,text){
+  const v=P.virtues;
+  const before=v[i];
+  v[i]=clamp(v[i]+amt,0,100);
+  if(text) msg(text, amt>0?"m-good":"m-bad");
+  if(amt>0 && v[i]>before){ msg(`Thou dost feel more ${VIRTUES[i].toLowerCase()}.`,"m-blue"); sfx.virtue(); }
+  else if(amt<0 && v[i]<before){ msg(`Thou hast strayed from ${VIRTUES[i]}.`,"m-bad"); }
+  checkAvatar(); renderStats();
+}
+function checkAvatar(){
+  if(P.avatar) return;
+  if(P.virtues.every(v=>v>=80) && !P.trialDone){
+    if(!P.trialNagged){ P.trialNagged=true;
+      msg("Thy virtues burn full — but the shrines demand thy TRIAL first. (E at any shrine.)","m-gold"); }
+    return;
+  }
+  if(P.virtues.every(v=>v>=80)){
+    P.avatar=true; mode="won"; sfx.level();
+    showOverlay("SAINTHOOD",
+      `The eight virtues blaze within thee as one flame.<br><br>
+       Word spreads from Moonhaven to Ironfast: the Stranger has become
+       the <b>SAINT</b> — a living example for all of Albion.<br><br>
+       Thy quest is complete... though the land is still thine to wander.`,
+      "— PRESS ANY KEY TO KEEP PLAYING —");
+  }
+}
+
+//---------------------------------------------------------------
+// 10. Rendering
+//---------------------------------------------------------------
+const cv=$("screen"), cx=cv.getContext("2d");
+cx.imageSmoothingEnabled=false;
+
+function tileAt(x,y){
+  if(inDun){
+    if(x<0||y<0||x>=DW||y>=DH) return T.DWALL;
+    return inDun.levels[inDun.lvl].grid[y*DW+x];
+  }
+  if(inLoc){
+    if(x<0||y<0||x>=inLoc.w||y>=inLoc.h) return T.GRASS;
+    const ch=inLoc.map[y][x];
+    switch(ch){
+      case "#": return T.WALL; case ".": return T.FLOOR; case "D": return T.DOOR;
+      case "C": return T.COUNTER; case "R": return T.THRONE; case "t": return T.FOREST;
+      case "~": return T.WATER; case "d": return T.DFLOOR; case "w": return T.DWALL;
+      case "s": return T.SHRINE; case "F": return T.FIRE; case "x": return T.DOOR;
+      case "r": return T.RUINS;
+      default: return T.GRASS;
+    }
+  }
+  return gw(x,y);
+}
+function isNight(){ const d=turns%400; return d>=280; }
+function moonPhase(){ return Math.floor(turns/28)%GATES.length; }
+
+function render(){
+  cx.fillStyle="#000"; cx.fillRect(0,0,cv.width,cv.height);
+  const px=P.x, py=P.y;
+  for(let vy=0;vy<VIEW;vy++)for(let vx=0;vx<VIEW;vx++){
+    const x=px-HALF+vx, y=py-HALF+vy;
+    const t=tileAt(x,y);
+    const sname=TSPR[t][(x+y+animF)%2===0?0:1];
+    cx.drawImage(SPRC[sname],vx*TILE,vy*TILE);
+    if(t===T.FLOOR && (x+y)%2===0) cx.drawImage(SPRC.floor2,vx*TILE,vy*TILE);
+  }
+  const draw=(sname,x,y)=>{
+    const vx=x-px+HALF, vy=y-py+HALF;
+    if(vx<0||vy<0||vx>=VIEW||vy>=VIEW) return;
+    cx.drawImage(SPRC[sname],vx*TILE,vy*TILE);
+  };
+  if(!inLoc){
+    if(!inDun){
+      const g=GATES[moonPhase()];
+      if(g){
+        // the doorway rises, stands, then sinks with the moon's passage
+        const p=(turns%28)/28;
+        const stage = p<.12?0 : p<.25?1 : p<.75?2 : p<.88?1 : 0;
+        draw(`gate${stage}f${animF}`,g.x,g.y);
+      }
+      if(P.moonCurse){
+        const cg=GATES[P.moonCurse.gate];
+        if(cg) draw(`dgate2f${animF}`,cg.x,cg.y);   // stuck open, burning red
+      }
+      if(whirl) draw("whirl",whirl.x,whirl.y);
+      if(ghostShip) draw("gships",ghostShip.x,ghostShip.y);
+      ships.forEach((s,i)=>{ if(!(P.onShip&&i===P.shipIdx)) draw(s.ghost?"gships":"ship",s.x,s.y); });
+    }
+    for(const c of chests) draw("chest",c.x,c.y);
+    for(const m of monsters) draw(m.spr,m.x,m.y);
+  } else {
+    for(const n of inLoc.npcs) draw(n.spr,n.x,n.y);
+    if(inLoc.raid){
+      for(const c of chests) draw("chest",c.x,c.y);
+      for(const m of monsters) draw(m.spr,m.x,m.y);
+    }
+  }
+  draw(P.onShip&&!inLoc ? (curShip()&&curShip().ghost?"gships":"ship") : "player", px, py);
+  // darkness: dungeons always, world at night
+  if(inDun || (!inLoc && isNight())){
+    const cxp=(HALF+.5)*TILE, cyp=(HALF+.5)*TILE;
+    const grad = inDun
+      ? cx.createRadialGradient(cxp,cyp,TILE*1.6,cxp,cyp,TILE*4.6)
+      : cx.createRadialGradient(cxp,cyp,TILE*2.2,cxp,cyp,TILE*6.5);
+    grad.addColorStop(0,"rgba(0,0,20,0)");
+    grad.addColorStop(1, inDun ? "rgba(0,0,6,0.97)" : "rgba(0,0,14,0.88)");
+    cx.fillStyle=grad; cx.fillRect(0,0,cv.width,cv.height);
+  }
+  renderStats();
+}
+
+const statsEl=$("stats");
+function renderStats(){
+  if(!P) return;
+  const w=WEAPONS[P.weapon], a=ARMORS[P.armor];
+  const phase=moonPhase();
+  const moons="●◐○".split("");
+  let html=`<h3>THE STRANGER${P.avatar?" ✦SAINT✦":""}</h3>`;
+  if(P.finalSiege && !P.finalDone) html+=`<div class="srow"><b style="color:var(--red)">⚔ CASTLE LUMEN BESIEGED!</b></div>`;
+  else if(P.siege) html+=`<div class="srow"><b style="color:var(--red)">${P.siege.fire?"🔥":"⚔"} ${LOCS[TOWN_KEYS[P.siege.town]].name} ${P.siege.fire?"burns":"besieged"}!</b></div>`;
+  if(P.moonCurse) html+=`<div class="srow"><b style="color:var(--red)">☠ A moongate festers!</b></div>`;
+  if(P.desec) html+=`<div class="srow"><b style="color:var(--red)">✦ Shrine of ${VIRTUES[P.desec.v]} defiled!</b></div>`;
+  if(P.dragonAwake && !P.dragonSlain && !(P.siege&&P.siege.fire))
+    html+=`<div class="srow"><b style="color:var(--red)">🔥 VARKUL has woken!</b></div>`;
+  if(ghostShip) html+=`<div class="srow"><b style="color:var(--blue)">☽ A pale ship rides the fog!</b></div>`;
+  if(P.risen && !P.risenDone) html+=`<div class="srow"><b style="color:var(--red)">☠ Dead captains walk!</b></div>`;
+  if(P.plot && !P.plotDone) html+=`<div class="srow"><b style="color:var(--red)">⚖ Treachery in the castle!</b></div>`;
+  if(!P.trialDone && P.trialHinted) html+=`<div class="srow"><b style="color:var(--accent)">✧ The Trial awaits!</b></div>`;
+  html+=`<div class="srow"><span>HP</span><b>${P.hp}/${P.maxhp}${P.poison?' <span style="color:#8f8">POISONED</span>':""}</b></div>`;
+  if(P.onShip){ const s=curShip(); html+=`<div class="srow"><span>Hull</span><b style="color:var(--blue)">${s.hull}/${s.maxhull}</b></div>`; }
+  html+=`<div class="srow"><span>Level</span><b>${P.level}</b></div>`;
+  html+=`<div class="srow"><span>Exp</span><b>${P.xp}</b></div>`;
+  html+=`<div class="srow"><span>Gold</span><b style="color:var(--accent)">${P.gold}</b></div>`;
+  html+=`<div class="srow"><span>Food</span><b>${P.food}</b></div>`;
+  html+=`<div class="srow"><span>Weapon</span><b>${w.name}</b></div>`;
+  html+=`<div class="srow"><span>Armor</span><b>${a.name}</b></div>`;
+  if(P.silverKey) html+=`<div class="srow"><span>Key</span><b style="color:#cfd8e8">Silver</b></div>`;
+  html+=`<div class="srow"><span>Moons</span><b>${moons[phase%3]} gate ${phase+1}</b></div>`;
+  html+=`<div class="srow"><span>Time</span><b>${inDun?"dark":"" || (isNight()?"night":"day")} · t${turns}</b></div>`;
+  html+=`<div class="srow"><span>Place</span><b>${
+    inDun? `${DUNGEONS[inDun.idx].name} L${inDun.lvl+1}` : inLoc? LOCS[inLoc.key].name : "Albion"}</b></div>`;
+  html+=`<h3 style="margin-top:8px">VIRTUES</h3>`;
+  VIRTUES.forEach((v,i)=>{
+    const val=P.virtues[i];
+    html+=`<div class="vrow"><span class="vname">${v}</span>
+      <div class="vbar"><div class="vfill${val>=80?" max":""}" style="width:${val}%"></div></div></div>`;
+  });
+  statsEl.innerHTML=html;
+}
+
+//---------------------------------------------------------------
+// 11. Overlay (title / help / death / win)
+//---------------------------------------------------------------
+const overlay=$("overlay");
+function showOverlay(title,body,go){
+  $("obox").innerHTML=`<h1>${title}</h1><p style="text-align:center">${body}</p><div class="go">${go||"— PRESS ANY KEY —"}</div>`;
+  overlay.classList.remove("off");
+}
+function hideOverlay(){ overlay.classList.add("off"); }
+
+//---------------------------------------------------------------
+// 12. Movement, world interaction
+//---------------------------------------------------------------
+function passable(x,y){
+  const t=tileAt(x,y);
+  if(inDun) return t===T.DFLOOR||t===T.LADDU||t===T.LADDD;
+  if(inLoc) return t!==T.WALL && t!==T.DWALL && t!==T.COUNTER && t!==T.WATER && t!==T.FOREST && t!==T.THRONE;
+  if(P.onShip) return WALK_SHIP.has(t);
+  return WALK_LAND.has(t);
+}
+function monsterAt(x,y){ return monsters.find(m=>m.x===x&&m.y===y); }
+function npcAt(x,y){ return inLoc? inLoc.npcs.find(n=>n.x===x&&n.y===y):null; }
+
+function tryMove(dx,dy){
+  const nx=P.x+dx, ny=P.y+dy;
+  // bump-attack
+  const m=(!inLoc || inLoc.raid) && monsterAt(nx,ny);
+  if(m){ attackMonster(m); tick(); return; }
+  if(npcAt(nx,ny)){ msg("The townsfolk step aside politely.","m-sys"); return; }
+  // exiting interior
+  if(inLoc){
+    const ch=(ny<0||nx<0||ny>=inLoc.h||nx>=inLoc.w)?"g":inLoc.map[ny][nx];
+    if(ch==="g"||ch==="x"){ leaveLoc(); return; }
+  }
+  if(!passable(nx,ny)){ sfx.bump(); msg("Blocked!","m-sys"); return; }
+  // valor: fleeing a foe that has drawn thy blood
+  if(!inLoc && !P.onShip){
+    const adj=monsters.some(mm=>mm.hasHit&&Math.abs(mm.x-P.x)<=1&&Math.abs(mm.y-P.y)<=1);
+    if(adj){
+      const stillAdj=monsters.some(mm=>mm.hasHit&&Math.abs(mm.x-nx)<=1&&Math.abs(mm.y-ny)<=1);
+      if(!stillAdj && R()<.5) virtue(2,-1,"Thou fleest the battle!");
+    }
+  }
+  if(P.onShip && ships.some((s,i)=>i!==P.shipIdx&&s.x===nx&&s.y===ny)){
+    sfx.bump(); msg("Another vessel blocks the way.","m-sys"); return;
+  }
+  P.x=nx; P.y=ny;
+  if(P.onShip && !inLoc){ const s=curShip(); s.x=nx; s.y=ny; }
+  sfx.step();
+  const t=tileAt(nx,ny);
+  if(inDun){
+    if(t===T.LADDD) msg("A ladder descends into darkness. Press E to climb down.","m-blue");
+    if(t===T.LADDU) msg(inDun.lvl===0
+      ? "A ladder climbs toward daylight. Press E to leave."
+      : "A ladder climbs upward. Press E.","m-blue");
+  } else if(!inLoc){
+    if(t===T.SWAMP && R()<.15) poisonPlayer("Poisoned by the swamp!");
+    if(t===T.TOWN||t===T.CASTLE) msg(`${t===T.CASTLE?"Castle Lumen":townName(nx,ny)} — press E to enter.`,"m-blue");
+    if(t===T.SHRINE){
+      const si=shrineIndex(nx,ny);
+      if(P.desec && P.desec.v===si)
+        msg(`The Shrine of ${VIRTUES[si]} crawls with cultists! Press E to confront them.`,"m-bad");
+      else msg(`A shrine of ${shrineVirtue(nx,ny)}. Press M to meditate.`,"m-blue");
+    }
+    if(t===T.LAIR) msg(P.dragonSlain? "VARKUL's cold, empty lair."
+      : P.dragonAwake? "VARKUL's lair — smoke curls from the mountain's mouth. Press E to face him."
+      : "A cave mouth in the mountain. Something vast breathes within.","m-blue");
+    if(t===T.DENT){
+      const d=DUNGEONS.find(d=>d.x===nx&&d.y===ny);
+      if(d) msg(`The dungeon ${d.name} yawns before thee — press E to descend.`,"m-blue");
+    }
+    if(t===T.RUINS) msg(P.risen&&!P.risenDone
+      ? "Eight open graves gape around the Silver Barrow. Press E to face the risen."
+      : P.barrowOpened
+      ? "The empty Silver Barrow."
+      : "The Silver Barrow, sealed by a silver lock. Press E.","m-blue");
+    const cg=P.moonCurse && GATES[P.moonCurse.gate];
+    if(cg && cg.x===nx && cg.y===ny){ startRaid("void","undead"); return; }
+    const g=GATES[moonPhase()];
+    if(g && g.x===nx && g.y===ny) enterGate();
+  }
+  if(inLoc && inLoc.raid && tileAt(nx,ny)===T.FIRE){
+    const burn=ri(3,6);
+    P.hp-=burn; sfx.hurt();
+    msg(`The flames sear thee for ${burn}!`,"m-bad");
+    if(P.hp<=0){ playerDeath(); return; }
+  }
+  if((!inLoc||inLoc.raid) && chests.some(c=>c.x===nx&&c.y===ny))
+    msg("A chest lies here — press G to open it.","m-gold");
+  tick();
+}
+function townName(x,y){
+  const i=TOWNS.findIndex(t=>t.x===x&&t.y===y);
+  return i>=0? LOCS[TOWN_KEYS[i]].name : "a town";
+}
+function shrineIndex(x,y){ return SHRINES.findIndex(s=>s.x===x&&s.y===y); }
+function shrineVirtue(x,y){ const i=shrineIndex(x,y); return i>=0?VIRTUES[i]:"?"; }
+
+function enterGate(){
+  sfx.gate();
+  const next=GATES[(moonPhase()+1)%GATES.length];
+  P.x=next.x; P.y=next.y;
+  msg("Blue fire swallows thee — a moongate! Thou art elsewhere.","m-blue");
+}
+
+function virtueAvg(){ return P.virtues.reduce((a,b)=>a+b,0)/8; }
+function skullhavenHostile(){
+  if(P.finalDone) return false;   // leaderless, the pirates keep the peace
+  return P.skullWrath || (virtueAvg()>=65 && !P.skullRespect);
+}
+
+function enterLoc(){
+  const t=gw(P.x,P.y);
+  if(t===T.DENT){ enterDungeon(); return; }
+  if(t===T.RUINS){
+    if(P.risen && !P.risenDone){ startRaid("graveyard","risen"); return; }
+    if(P.barrowOpened) msg("The Silver Barrow lies open and empty, its silver door ajar.","m-sys");
+    else if(!P.silverKey) msg("A barrow of pale stone. A silver lock seals it — no iron key will ever fit.","m-sys");
+    else {
+      P.barrowOpened=true; P.silverKey=false;
+      P.gold+=300;
+      P.weapon=Math.max(P.weapon,5);
+      sfx.level();
+      msg("The silver key turns with a sigh, and the barrow opens...","m-blue");
+      msg("Within lie 300 gold — and the MOONBLADE, silver and singing!","m-gold");
+      virtue(5,3,"An ancient wrong set right.");
+    }
+    return;
+  }
+  if(t===T.LAIR){
+    if(P.dragonSlain) msg("The lair lies cold and still, picked clean of its master.","m-sys");
+    else if(!P.dragonAwake) msg("A vast, slow breathing echoes inside the mountain. Best not wake it.","m-sys");
+    else startRaid("lair","dragon");
+    return;
+  }
+  if(t===T.SHRINE){
+    const si=shrineIndex(P.x,P.y);
+    if(P.desec && P.desec.v===si){ startRaid("shrinemap","cult"); return; }
+    if(!P.trialDone && P.virtues.every(v=>v>=70)){
+      askYesNo("The shrine hums with summons. Face thy Trial NOW? (Y/N)",
+        ()=>startRaid("trial","trial"),
+        ()=>msg("The light dims, patient. It will wait for thee.","m-sys"));
+      return;
+    }
+    msg("A quiet shrine. Meditate here with M.","m-sys");
+    return;
+  }
+  let key=null;
+  if(t===T.CASTLE) key="castle";
+  else if(t===T.TOWN){ const i=TOWNS.findIndex(tt=>tt.x===P.x&&tt.y===P.y); if(i>=0) key=TOWN_KEYS[i]; }
+  if(!key){ msg("There is nothing to enter here.","m-sys"); return; }
+  if(key==="castle" && P.finalSiege && !P.finalDone){ startRaid("castle","final"); return; }
+  if(key==="town2" && skullhavenHostile()){ startRaid("town2","skull"); return; }
+  if(P.siege && TOWN_KEYS[P.siege.town]===key){ startRaid(key, P.siege.fire?"fire":"siege"); return; }
+  const L=LOCS[key];
+  const rows=L.map.map(r=>r);
+  const npcs=[];
+  const grid=rows.map(r=>r.split(""));
+  let entry=null;
+  for(let y=0;y<grid.length;y++)for(let x=0;x<grid[y].length;x++){
+    const ch=grid[y][x];
+    if(L.npcs[ch]){
+      const def=L.npcs[ch];
+      if(!(key==="town2" && P.finalDone && def.name==="Pirate King Rafe"))
+        npcs.push(Object.assign({x,y},def));
+      grid[y][x]=(grid[y][x-1]===","||grid[y][x+1]===",")?",":"."; }
+    else if(ch==="@"){ entry={x,y}; grid[y][x]=","; }
+  }
+  inLoc={key, map:grid.map(r=>r.join("")), npcs, w:grid[0].length, h:grid.length,
+         ret:{x:P.x,y:P.y}};
+  P.x=entry?entry.x:Math.floor(inLoc.w/2);
+  P.y=entry?entry.y:inLoc.h-2;
+  // the traitor's court: six extra guards muster in the great hall
+  if(key==="castle" && P.plot && !P.plotDone){
+    const names=["Aldric","Bram","Corin","Dagny","Edda","Farrow"];
+    const spots=[[3,7],[6,7],[12,7],[15,7],[6,9],[12,9]];
+    names.forEach((nm,k)=>{
+      const traitor=P.plot.traitors.includes(k);
+      inLoc.npcs.push({name:"Guard "+nm, spr:"guard", x:spots[k][0], y:spots[k][1],
+        plotGuard:true, traitor,
+        greet: traitor
+          ? `Guard ${nm} salutes stiffly. A heavy VAULT KEY swings, half-hidden, at his belt.`
+          : `Guard ${nm} stands at weary attention.`,
+        lines:{
+          job:"Mustered for inspection, by Lord Lumen's order.",
+          night: traitor? "I... slept. Aye. Slept sound and honest."
+                        : "Stood my watch and saw naught but owls, as ever.",
+          key: traitor? "What key? THIS key? 'Tis... ceremonial."
+                      : "The vault keys hang in the vault, where they belong.",
+        }});
+    });
+    msg("Six guards stand mustered in the hall. Two are traitors.","m-bad");
+    msg("(Question them — JOB, NIGHT, KEY. Ask Pip what he saw. Accuse with F.)","m-sys");
+  }
+  msg(`Thou enterest ${L.name}.`,"m-blue");
+  if(key==="town2" && P.skullRespect)
+    msg("The pirates eye thee warily — strength they respect.","m-sys");
+  render();
+}
+function leaveLoc(){
+  if(inLoc.raid){
+    const left=monsters.length, kind=inLoc.raid;
+    const engaged=monsters.some(m=>m.hasHit);   // did they draw thy blood?
+    monsters=wMobs||[]; chests=wChests||[]; wMobs=wChests=null;
+    if(left>0){
+      if(kind==="ambush"){
+        const cut=Math.floor(P.gold*.1);
+        P.gold-=cut; P.lastAmbush=turns;
+        msg(`Thou runnest — and they cut thy purse for ${cut} gold as thou goest!`,"m-bad");
+        if(engaged) virtue(2,-2);
+      } else if(!engaged){
+        msg("Thou withdrawest before blades cross.","m-sys");
+      } else if(kind==="undead"){
+        msg("Thou retreatest — the dead still hold the gate!","m-bad");
+        virtue(2,-2);
+      } else if(kind==="final"){
+        msg("Thou abandonest Lord Lumen's halls to the Pirate King!","m-bad");
+        virtue(2,-5);
+      } else if(kind==="siege"){
+        msg(`Thou abandonest ${LOCS[inLoc.key].name} to the reavers!`,"m-bad");
+        virtue(2,-3);
+      } else if(kind==="rats"){
+        msg("The rats reclaim the cellar. Marla sighs behind thee.","m-sys");
+      } else if(kind==="cult"){
+        msg("The backward chanting resumes...","m-bad");
+        virtue(2,-2);
+      } else if(kind==="fire"){
+        msg(`Thou abandonest ${LOCS[inLoc.key].name} to the flames!`,"m-bad");
+        virtue(2,-3);
+      } else if(kind==="dragon"){
+        msg("VARKUL's laughter follows thee down the mountain.","m-bad");
+        virtue(2,-3);
+      } else if(kind==="ghostship"){
+        msg("Thou leapest back aboard. The pale ship waits, patient as the drowned.","m-sys");
+      } else if(kind==="risen"){
+        msg("Bone hands wave thee farewell. They will wait at the barrow.","m-bad");
+        virtue(2,-2);
+      } else if(kind==="plot"){
+        msg("The conspirators bar the doors behind thee. The plot festers on.","m-bad");
+        virtue(3,-3);
+      } else if(kind==="trial"){
+        msg("The light dims without judgment. Return when thou art ready.","m-sys");
+        virtue(7,-2);
+      } else {
+        msg("The pirates jeer as thou fleest Skullhaven!","m-bad");
+        virtue(2,-2);
+      }
+    }
+    if(inLoc.parent){    // raids entered from inside a town return there
+      msg(`Thou leavest ${LOCS[inLoc.key].name}.`,"m-sys");
+      const par=inLoc.parent;
+      inLoc=par.loc; P.x=par.pos.x; P.y=par.pos.y;
+      render(); return;
+    }
+  }
+  msg(`Thou leavest ${LOCS[inLoc.key].name}.`,"m-sys");
+  P.x=inLoc.ret.x; P.y=inLoc.ret.y; inLoc=null;
+  render();
+}
+
+const CAPTAINS=["Captain Blackmaw","Iron Bess","Red Roderick","The Gull King",
+                "Mad Corvus","Salt-Queen Vex","Bonny Drake","Old Hexhand"];
+function startRaid(key,kind){
+  const L=LOCS[key];
+  const grid=L.map.map(r=>r.split(""));
+  let entry=null; const hoard=[];
+  for(let y=0;y<grid.length;y++)for(let x=0;x<grid[y].length;x++){
+    const ch=grid[y][x];
+    if(L.npcs[ch]) grid[y][x]=(grid[y][x-1]===","||grid[y][x+1]===",")?",":".";
+    else if(ch==="@"){
+      entry={x,y};
+      const nb=[grid[y][x-1],grid[y][x+1],(grid[y-1]||[])[x]];
+      grid[y][x]= nb.includes("d")?"d" : nb.includes(".")?"." : ",";
+    }
+    else if(ch==="$"){ hoard.push({x,y}); grid[y][x]="d"; }
+  }
+  if(kind==="fire"){   // the dragon's flames litter the streets
+    for(let y=0;y<grid.length;y++)for(let x=0;x<grid[y].length;x++){
+      const ch=grid[y][x];
+      if((ch===","||ch===".") && R()<.12 &&
+         Math.abs(x-entry.x)+Math.abs(y-entry.y)>2) grid[y][x]="F";
+    }
+  }
+  const parent = (inLoc && !inLoc.raid) ? {loc:inLoc, pos:{x:P.x,y:P.y}} : null;
+  wMobs=monsters; wChests=chests;
+  monsters=[]; chests=[];
+  hoard.forEach(h=>chests.push({x:h.x,y:h.y,gold:ri(150,300)}));
+  inLoc={key, map:grid.map(r=>r.join("")), npcs:[], raid:kind, parent,
+         w:grid[0].length, h:grid.length,
+         ret: parent? parent.loc.ret : {x:P.x,y:P.y}};
+  P.x=entry.x; P.y=entry.y;
+  // muster the raiders on open ground away from the gate
+  const open=[];
+  for(let y=0;y<inLoc.h;y++)for(let x=0;x<inLoc.w;x++){
+    const ch=inLoc.map[y][x];
+    if((ch===","||ch==="."||ch==="d") && Math.abs(x-P.x)+Math.abs(y-P.y)>3) open.push({x,y});
+  }
+  const war=P.pirateWar||0;
+  const raiders=[];
+  if(kind==="undead"){
+    const uw=P.undeadWar||0;
+    const crew=Math.min(6+uw,12);
+    for(let k=0;k<crew && open.length;k++){
+      const i=Math.floor(R()*open.length), p=open.splice(i,1)[0];
+      const def=R()<.6? MONST.skeleton : MONST.ghost;
+      raiders.push({key:"undead",name:def.name,spr:def.spr,x:p.x,y:p.y,
+        hp:def.hp+uw*3,dmg:def.dmg+uw,ac:def.ac,xp:def.xp+uw*5,
+        gold:[def.gold[0],def.gold[1]+uw*4],water:false});
+    }
+    if(open.length){
+      const i=Math.floor(R()*open.length), p=open.splice(i,1)[0];
+      raiders.push({key:"undead",name:"the Barrow King",spr:"lich",x:p.x,y:p.y,
+        hp:60+uw*8,dmg:14+uw*2,ac:4,xp:120+uw*15,gold:[80+uw*20,140+uw*30],water:false,proper:true});
+      inLoc.captain="the Barrow King";
+    }
+    monsters=raiders;
+    msg("Beyond the gate lies a starless dark. Bone and shade turn toward thee!","m-bad");
+    msg(`The Barrow King's hollow voice: "Another warm one..." (${monsters.length} dead walk)`,"m-bad");
+    sfx.hurt(); render();
+    return;
+  }
+  if(kind==="rats"){
+    for(let k=0;k<5 && open.length;k++){
+      const i=Math.floor(R()*open.length), p=open.splice(i,1)[0];
+      raiders.push({key:"rat",name:"giant rat",spr:"rat",x:p.x,y:p.y,
+        hp:6,dmg:4,ac:0,xp:6,gold:[0,3],water:false});
+    }
+    if(open.length){
+      const i=Math.floor(R()*open.length), p=open.splice(i,1)[0];
+      raiders.push({key:"rat",name:"the Rat King",spr:"rat",x:p.x,y:p.y,
+        hp:18,dmg:4,ac:1,xp:25,gold:[5,15],water:false,proper:true});
+    }
+    monsters=raiders;
+    msg("The cellar seethes with red eyes. Squeaking rises to a scream!","m-bad");
+    msg(`(${monsters.length} rats — and one of them wears a tiny crown.)`,"m-sys");
+    sfx.hurt(); render(); return;
+  }
+  if(kind==="cult"){
+    const cw=P.cultWar||0;
+    for(let k=0;k<Math.min(4+cw,10) && open.length;k++){
+      const i=Math.floor(R()*open.length), p=open.splice(i,1)[0];
+      raiders.push({key:"cult",name:"cultist",spr:"cultist",x:p.x,y:p.y,
+        hp:16+cw*3,dmg:8+cw,ac:1,xp:20+cw*5,gold:[4,14+cw*4],water:false});
+    }
+    if(open.length){
+      const i=Math.floor(R()*open.length), p=open.splice(i,1)[0];
+      raiders.push({key:"cult",name:"the Heresiarch",spr:"mage",x:p.x,y:p.y,
+        hp:40+cw*6,dmg:13+cw*2,ac:3,xp:70+cw*12,gold:[30+cw*10,60+cw*15],water:false,proper:true});
+    }
+    monsters=raiders;
+    msg("Cultists circle the defiled shrine, chanting the mantra BACKWARD.","m-bad");
+    msg(`The Heresiarch sneers: "Thy virtues are LIES!" (${monsters.length} heretics)`,"m-bad");
+    sfx.hurt(); render(); return;
+  }
+  if(kind==="fire"){
+    for(let k=0;k<5 && open.length;k++){
+      const i=Math.floor(R()*open.length), p=open.splice(i,1)[0];
+      raiders.push({key:"drake",name:"drake whelp",spr:"drake",x:p.x,y:p.y,
+        hp:26,dmg:11,ac:2,xp:35,gold:[0,12],water:false});
+    }
+    monsters=raiders;
+    msg(`${L.name} burns! Drake whelps tumble through the smoke, setting roofs alight!`,"m-bad");
+    msg(`(${monsters.length} whelps — and beware the flames underfoot!)`,"m-sys");
+    sfx.hurt(); render(); return;
+  }
+  if(kind==="dragon"){
+    for(let k=0;k<3 && open.length;k++){
+      const i=Math.floor(R()*open.length), p=open.splice(i,1)[0];
+      raiders.push({key:"drake",name:"drake",spr:"drake",x:p.x,y:p.y,
+        hp:30,dmg:12,ac:3,xp:45,gold:[0,15],water:false});
+    }
+    if(open.length){
+      const i=Math.floor(R()*open.length), p=open.splice(i,1)[0];
+      raiders.push({key:"dragon",name:"VARKUL",spr:"dragon",x:p.x,y:p.y,
+        hp:200,dmg:28,ac:6,xp:500,gold:[300,500],water:false,ranged:3,proper:true});
+      inLoc.captain="VARKUL";
+    }
+    monsters=raiders;
+    msg("Heat rolls over thee. Gold beyond counting — and coiled atop it, VARKUL.","m-bad");
+    msg('"LITTLE THING," the dragon rumbles. "COME. BE BRIEF."',"m-bad");
+    sfx.die(); render(); return;
+  }
+  if(kind==="ambush"){
+    const n=Math.min(4+Math.floor(P.gold/300),8);
+    for(let k=0;k<n && open.length;k++){
+      const i=Math.floor(R()*open.length), p=open.splice(i,1)[0];
+      raiders.push({key:"bandit",name:"bandit",spr:"pirate",x:p.x,y:p.y,
+        hp:18,dmg:9,ac:1,xp:18,gold:[0,8],water:false});
+    }
+    monsters=raiders;
+    msg("Thou wakest to steel on flint — bandits ring thy camp!","m-bad");
+    msg(`"A fat purse sleeps loud, friend." (${monsters.length} bandits)`,"m-bad");
+    sfx.hurt(); render(); return;
+  }
+  if(kind==="ghostship"){
+    for(let k=0;k<6 && open.length;k++){
+      const i=Math.floor(R()*open.length), p=open.splice(i,1)[0];
+      raiders.push({key:"drowned",name:"drowned sailor",spr:"ghost",x:p.x,y:p.y,
+        hp:20,dmg:10,ac:2,xp:24,gold:[0,10],water:false});
+    }
+    if(open.length){
+      const i=Math.floor(R()*open.length), p=open.splice(i,1)[0];
+      raiders.push({key:"drowned",name:"the Drowned Captain",spr:"lich",x:p.x,y:p.y,
+        hp:55,dmg:16,ac:3,xp:90,gold:[40,90],water:false,proper:true});
+    }
+    monsters=raiders;
+    msg("The deck is cold underfoot. Her crew still stands the watch — drowned, every one.","m-bad");
+    msg(`The Drowned Captain turns: "Relief... at last..." (${monsters.length} souls)`,"m-bad");
+    sfx.hurt(); render(); return;
+  }
+  if(kind==="risen"){
+    CAPTAINS.forEach((cname,ci)=>{
+      if(!open.length) return;
+      const i=Math.floor(R()*open.length), p=open.splice(i,1)[0];
+      raiders.push({key:"risen",name:cname+" (risen)",spr:"skeleton",x:p.x,y:p.y,
+        hp:36+ci*3,dmg:14,ac:3,xp:60,gold:[20,50],water:false,proper:true});
+    });
+    monsters=raiders;
+    msg("The barrow-earth heaves. Eight graves open as one.","m-bad");
+    msg(`The captains thou slewest stand again, bone and grudge. (${monsters.length})`,"m-bad");
+    sfx.die(); render(); return;
+  }
+  if(kind==="trial"){
+    const shadows=[
+      {v:"Honesty",hp:30,dmg:12,ac:6},{v:"Compassion",hp:60,dmg:8,ac:2},
+      {v:"Valor",hp:35,dmg:20,ac:2},{v:"Justice",hp:40,dmg:14,ac:3},
+      {v:"Sacrifice",hp:20,dmg:18,ac:2},{v:"Honor",hp:40,dmg:12,ac:4},
+      {v:"Spirituality",hp:30,dmg:12,ac:2,ranged:2},{v:"Humility",hp:70,dmg:10,ac:2},
+    ];
+    shadows.forEach(s=>{
+      if(!open.length) return;
+      const i=Math.floor(R()*open.length), p=open.splice(i,1)[0];
+      raiders.push({key:"shadow",name:"the Shadow of "+s.v,spr:"shadow",x:p.x,y:p.y,
+        hp:s.hp,dmg:s.dmg,ac:s.ac,xp:50,gold:[0,0],water:false,ranged:s.ranged,proper:true});
+    });
+    monsters=raiders;
+    msg("Light without sun. Silence without peace. Eight shapes rise — each one THEE.","m-bad");
+    msg("(Thy shadows must fall for the Saint to stand. There is no shame in retreat — only delay.)","m-sys");
+    sfx.gate(); render(); return;
+  }
+  const grunt=MONST.pirate;
+  const crew=Math.min(5+war,11);
+  for(let k=0;k<crew && open.length;k++){
+    const i=Math.floor(R()*open.length), p=open.splice(i,1)[0];
+    raiders.push({key:"pirate",name:"pirate raider",spr:"pirate",x:p.x,y:p.y,
+      hp:grunt.hp+war*2,dmg:grunt.dmg+war,ac:grunt.ac,xp:grunt.xp+war*4,
+      gold:[grunt.gold[0],grunt.gold[1]+war*4],water:false});
+  }
+  if(kind==="final" && open.length){
+    const i=Math.floor(R()*open.length), p=open.splice(i,1)[0];
+    raiders.push({key:"pirate",name:"Pirate King Rafe",spr:"lord",x:p.x,y:p.y,
+      hp:140,dmg:24,ac:5,xp:300,gold:[200,400],water:false,proper:true});
+    inLoc.captain="Pirate King Rafe";
+  }
+  else if(open.length){
+    const i=Math.floor(R()*open.length), p=open.splice(i,1)[0];
+    const cname=CAPTAINS[war%CAPTAINS.length];
+    raiders.push({key:"pirate",name:cname,spr:"guard",x:p.x,y:p.y,
+      hp:34+war*6,dmg:15+war*2,ac:3,xp:50+war*10,gold:[30+war*10,60+war*15],water:false,proper:true});
+    inLoc.captain=cname;
+  }
+  monsters=raiders;
+  if(kind==="final"){
+    msg("The Pirate King's fleet holds Castle Lumen! Lord Lumen is barricaded in the vaults.","m-bad");
+    msg(`Rafe lounges upon the throne: "Come then, saint. TAKE it back." (${monsters.length} foes)`,"m-bad");
+  } else if(kind==="siege"){
+    msg(`${L.name} burns! Pirate reavers hold the streets!`,"m-bad");
+    msg(`${inLoc.captain||"A captain"} leads them. (${monsters.length} pirates) Drive them out!`,"m-bad");
+  } else {
+    msg("Steel rings out — Skullhaven rises against thee!","m-bad");
+    msg(`"No saints in Skullhaven!" ${inLoc.captain||"A captain"} and ${monsters.length-1} pirates bar thy way.`,"m-bad");
+  }
+  sfx.hurt();
+  render();
+}
+
+//---------------------------------------------------------------
+// 13. Combat
+//---------------------------------------------------------------
+function mN(m){ return m.proper? m.name : "the "+m.name; }
+function mNC(m){ return m.proper? m.name : "The "+m.name; }
+function attackMonster(m){
+  const w=WEAPONS[P.weapon];
+  const hitCh=.75 + P.level*.04 - m.ac*.05;
+  if(R()<hitCh){
+    const dmg=ri(w.min,w.max)+Math.floor(P.level/2);
+    m.hp-=dmg; sfx.hit();
+    msg(`Thou strikest ${mN(m)} for ${dmg}!`,"m-say");
+    if(m.hp<=0) killMonster(m);
+  } else { sfx.miss(); msg(`Thou missest ${mN(m)}.`,"m-sys"); }
+}
+function killMonster(m){
+  monsters=monsters.filter(x=>x!==m);
+  msg(m.capture ? `${mNC(m)}'s crew is overwhelmed!`
+     : m.water  ? `${mNC(m)} sinks beneath the waves!`
+     : `${mNC(m)} is slain!`,"m-good");
+  P.xp+=m.xp;
+  virtue(2, 1);
+  const g=ri(m.gold[0],m.gold[1]);
+  if(m.capture){
+    ships.push({x:m.x,y:m.y,hull:30,maxhull:50});
+    msg("The pirates strike their colors — their ship is thine to claim!","m-gold");
+    if(g>0){ P.gold+=g; msg(`Thou findest ${g} gold in her hold.`,"m-gold"); }
+  }
+  else if(g>0 && m.water){ P.gold+=g; msg(`Thou fishest ${g} gold from the wreckage.`,"m-gold"); }
+  else if(g>0) chests.push({x:m.x,y:m.y,gold:g});
+  if(m.name==="the Barrow King" && !P.silverKey && !P.barrowOpened){
+    P.silverKey=true;
+    msg("Among the Barrow King's dust gleams a SILVER KEY!","m-gold");
+    msg("(Somewhere in Albion, a silver lock has waited long for it...)","m-sys");
+  }
+  // level up (before any raid-completion return)
+  if(P.xp >= P.level*(P.level+1)*50){   // 100, 300, 600, 1000... — no more level snowballing
+    P.level++; P.maxhp+=20; P.hp=P.maxhp;
+    msg(`Welcome to level ${P.level}! Thou feelest stronger.`,"m-gold");
+    sfx.level();
+  }
+  // raid broken?
+  if(inLoc && inLoc.raid && monsters.length===0){
+    if(inLoc.raid==="undead"){
+      P.undeadWar=(P.undeadWar||0)+1;
+      P.moonCurse=null; P.lastCurse=turns;
+      const grave=60+40*P.undeadWar;
+      P.gold+=grave;
+      msg("The last of the dead crumbles to dust. The gate's fire cools to silver-blue.","m-good");
+      msg(`Among the bones thou findest ${grave} gold.`,"m-gold");
+      virtue(6,4,"Thou hast faced the dark beyond the gate.");
+      virtue(2,3);
+      sfx.level();
+      msg("(The moons will darken again. The dead grow restless...)","m-sys");
+      return;
+    }
+    if(inLoc.raid==="rats"){
+      P.ratsDone=true;
+      P.gold+=25; P.food+=50;
+      msg("The Rat King squeaks his last. The cellar falls silent.","m-good");
+      msg('Marla presses 25 gold and a sack of provisions on thee. "My hero!"',"m-gold");
+      virtue(1,2,"A neighbor helped is a neighbor kept.");
+      sfx.gold();
+      return;
+    }
+    if(inLoc.raid==="cult"){
+      const v=P.desec? P.desec.v : 0;
+      P.cultWar=(P.cultWar||0)+1;
+      P.desec=null; P.lastDesec=turns;
+      const tithe=40+20*P.cultWar;
+      P.gold+=tithe;
+      msg(`The Heresiarch falls. The Shrine of ${VIRTUES[v]} breathes clean air again.`,"m-good");
+      msg(`The cult's tithe box holds ${tithe} gold.`,"m-gold");
+      virtue(v,8,"Reconsecrated by thy hand.");
+      virtue(6,2);
+      sfx.level();
+      msg("(The cult will find another shrine to hate...)","m-sys");
+      return;
+    }
+    if(inLoc.raid==="fire"){
+      P.siege=null; P.lastSiege=turns;
+      P.gold+=120;
+      msg(`The last whelp falls and the bucket-lines win. ${LOCS[inLoc.key].name} is saved!`,"m-good");
+      msg("The townsfolk press 120 gold upon thee.","m-gold");
+      virtue(1,3,"Thou stoodest in the fire for them.");
+      virtue(2,3);
+      sfx.level();
+      msg("(Only VARKUL's death ends the burnings. His lair smokes in the mountains.)","m-sys");
+      return;
+    }
+    if(inLoc.raid==="dragon"){
+      P.dragonSlain=true;
+      if(P.siege && P.siege.fire) P.siege=null;
+      P.armor=Math.max(P.armor,5);
+      msg("VARKUL crashes down upon his own gold, and is still.","m-gold");
+      msg("From his hide thou cuttest DRAGONSCALE ARMOR (+8 def)!","m-gold");
+      virtue(2,5,"The fire of the peaks is out.");
+      virtue(5,4);
+      mode="won"; sfx.level();
+      showOverlay("THE DRAGON FALLS",
+        `VARKUL, fire of the peaks, is slain.<br><br>
+         The mountains keep their snow; the towns keep their roofs; and a
+         hoard of a hundred years lies open around thee. Take thy fill.`,
+        "— PRESS ANY KEY —");
+      return;
+    }
+    if(inLoc.raid==="ambush"){
+      P.lastAmbush=turns;
+      const heal=ri(10,25);
+      P.hp=Math.min(P.maxhp,P.hp+heal);
+      msg("The last bandit falls across thy bedroll. Thou finishest thy rest regardless.","m-good");
+      msg(`(Healed ${heal} HP. Loot their chests before thou strikest camp.)`,"m-sys");
+      virtue(2,2,"They picked the wrong camp.");
+      return;
+    }
+    if(inLoc.raid==="ghostship"){
+      const gs={x:ghostShip.x,y:ghostShip.y,hull:70,maxhull:70,ghost:true};
+      ships.push(gs); ghostShip=null;
+      msg("The Drowned Captain smiles, and his crew falls to peaceful dust.","m-good");
+      msg("THE PALE SHIP IS THINE — her spectral hull shrugs off half of every blow.","m-gold");
+      virtue(6,3,"Thou hast given the drowned their rest.");
+      sfx.level();
+      return;
+    }
+    if(inLoc.raid==="risen"){
+      P.risenDone=true; P.risen=false;
+      P.gold+=400;
+      msg("The eighth captain crumbles. The barrow-earth settles, satisfied.","m-good");
+      msg("Among the graves: 400 gold in grave-tribute.","m-gold");
+      virtue(5,5,"Thou gavest them the ends they earned.");
+      virtue(2,4);
+      sfx.level();
+      return;
+    }
+    if(inLoc.raid==="plot"){
+      P.plotDone=true; P.plot=null;
+      P.gold+=150;
+      msg("The last conspirator falls. The court exhales.","m-good");
+      msg('Lord Lumen: "Justice, cleanly done. Take this, with Albion\'s thanks." (+150g)',"m-gold");
+      virtue(3,6,"The guilty answered; the innocent stand.");
+      virtue(5,4);
+      sfx.level();
+      return;
+    }
+    if(inLoc.raid==="trial"){
+      P.trialDone=true;
+      msg("The eighth shadow thins to nothing. The light holds — and holds THEE.","m-gold");
+      P.virtues=P.virtues.map(v=>clamp(v+3,0,100));
+      mode="won"; sfx.level();
+      showOverlay("THE TRIAL IS PASSED",
+        `Eight shadows of thyself — pride, cowardice, greed, despair — met and mastered.<br><br>
+         The shrines are silent now, the way to Sainthood open. Let thy
+         virtues burn to fullness, and the title is thine.`,
+        "— PRESS ANY KEY —");
+      checkAvatar();
+      return;
+    }
+    P.pirateWar=(P.pirateWar||0)+1;
+    if(inLoc.raid==="final"){
+      P.finalDone=true; P.finalSiege=false;
+      P.siege=null; P.skullWrath=false; P.skullRespect=true;
+      P.gold+=500;
+      msg("The Pirate King falls from the throne he stole. The war is OVER.","m-gold");
+      msg("Lord Lumen emerges: \"Albion owes thee more than gold — but here is 500 of it.\"","m-gold");
+      virtue(2,5,"Thy valor ends a war.");
+      virtue(3,5); virtue(5,5);
+      mode="won"; sfx.level();
+      showOverlay("THE PIRATE WAR ENDS",
+        `Eight captains hunted. A fleet broken. A king unmade.<br><br>
+         Castle Lumen stands free, and from Moonhaven to Skullhaven the
+         sailors drink to the Stranger who ended the pirate war.<br><br>
+         The sea lanes are open. The shrines await.`,
+        "— PRESS ANY KEY —");
+    }
+    else if(inLoc.raid==="siege"){
+      const bounty=80+40*P.pirateWar;
+      P.siege=null; P.lastSiege=turns;
+      P.gold+=bounty;
+      msg(`${LOCS[inLoc.key].name} is saved! The grateful town presses ${bounty} gold upon thee.`,"m-gold");
+      virtue(2,3,"Thou stoodest when others fled.");
+      virtue(3,3);
+      sfx.level();
+    } else {
+      P.skullRespect=true; P.skullWrath=false;
+      msg("The last pirate falls. Skullhaven goes quiet...","m-good");
+      msg('"Any dog that bites that hard drinks free." The port is thine again.',"m-gold");
+      sfx.level();
+    }
+    if(inLoc.raid!=="final")
+      msg("(The pirates will not forget. Their next crews will be larger.)","m-sys");
+  }
+}
+function monPass(m,x,y){
+  const t=tileAt(x,y);
+  if(inDun) return t===T.DFLOOR||t===T.LADDU||t===T.LADDD;
+  if(inLoc) return t===T.FLOOR||t===T.DOOR||t===T.GRASS||t===T.DFLOOR;
+  return m.water? WALK_SHIP.has(t)
+    : WALK_LAND.has(t)&&t!==T.TOWN&&t!==T.CASTLE&&t!==T.SHRINE&&t!==T.DENT;
+}
+function hullHit(dmg,src){
+  const s=curShip(); if(!s) return;
+  if(s.ghost) dmg=Math.max(1,Math.ceil(dmg/2));   // blows pass half-through the pale hull
+  s.hull-=dmg; sfx.hurt();
+  msg(`The ${src} rends thy hull for ${dmg}!${s.ghost?" (the spectral timbers shrug)":""}`,"m-bad");
+  if(s.hull<=0) shipwreck();
+}
+function shipwreck(){
+  msg("Thy ship founders and slips beneath the waves!","m-bad");
+  ships.splice(P.shipIdx,1);
+  P.onShip=false; P.shipIdx=-1;
+  // wash ashore at the nearest land tile
+  outer:
+  for(let r=1;r<30;r++)for(let oy=-r;oy<=r;oy++)for(let ox=-r;ox<=r;ox++){
+    if(WALK_LAND.has(gw(P.x+ox,P.y+oy))){ P.x+=ox; P.y+=oy; break outer; }
+  }
+  const d=ri(8,20);
+  P.hp-=d;
+  msg(`Half-drowned, thou washest ashore (${d} damage).`,"m-bad");
+  if(P.hp<=0) playerDeath();
+}
+function monsterTurn(){
+  if(inLoc && !inLoc.raid) return;
+  for(const m of monsters){
+    const dx=P.x-m.x, dy=P.y-m.y, dist=Math.abs(dx)+Math.abs(dy);
+    if(dist===1){
+      // attack player (or the hull, if aboard)
+      if(R()<.6){
+        const raw=ri(1,m.dmg);
+        m.hasHit=true;
+        if(P.onShip && !inLoc){ hullHit(Math.max(1,raw),m.name); if(mode==="dead") return; }
+        else {
+          const dmg=Math.max(1,raw-ARMORS[P.armor].def);
+          P.hp-=dmg; sfx.hurt();
+          msg(`${mNC(m)} hits thee for ${dmg}!`,"m-bad");
+          if(m.poison && R()<.2) poisonPlayer("Thou art poisoned!");
+          if(P.hp<=0){ playerDeath(); return; }
+        }
+      } else msg(`${mNC(m)} misses thee.`,"m-sys");
+      continue;
+    }
+    // ranged: pirate broadsides & serpent fire along rows/columns
+    if(m.ranged && dist<=m.ranged && (dx===0||dy===0) && R()<.5){
+      let clear=true;
+      const sx=Math.sign(dx), sy=Math.sign(dy);
+      for(let i=1;i<dist;i++){
+        const tt=tileAt(m.x+sx*i,m.y+sy*i);
+        if(!(WALK_SHIP.has(tt)||tt===T.GRASS||tt===T.SAND||tt===T.SWAMP||tt===T.HILLS
+             ||tt===T.FLOOR||tt===T.DFLOOR||tt===T.DOOR||tt===T.FIRE)){ clear=false; break; }
+      }
+      if(clear){
+        const raw=ri(2,m.dmg);
+        m.hasHit=true;
+        const what = m.capture? "cannonball" : "gout of flame";
+        if(P.onShip && !inLoc){
+          msg(m.capture? `${mNC(m)} fires a broadside!` : `${mNC(m)} spits flame!`,"m-bad");
+          hullHit(raw,what); if(mode==="dead") return;
+        }
+        else {
+          const dmg=Math.max(1,raw-ARMORS[P.armor].def);
+          P.hp-=dmg; sfx.hurt();
+          msg(`A ${what} from ${mN(m)} strikes thee for ${dmg}!`,"m-bad");
+          if(P.hp<=0){ playerDeath(); return; }
+        }
+        continue;
+      }
+    }
+    if(dist>10) continue;
+    // step toward player
+    const opts=[];
+    if(dx!==0) opts.push([Math.sign(dx),0]);
+    if(dy!==0) opts.push([0,Math.sign(dy)]);
+    if(R()<.25) opts.reverse();
+    for(const[ox,oy]of opts){
+      const nx=m.x+ox, ny=m.y+oy;
+      if(nx===P.x&&ny===P.y) break;
+      if(monPass(m,nx,ny) && !monsterAt(nx,ny)){ m.x=nx; m.y=ny; break; }
+    }
+  }
+}
+function spawnMonsters(){
+  if(turns<30) return;   // a quiet first morning
+  const nearCastle=(P.x-CASTLE.x)**2+(P.y-CASTLE.y)**2 < 196;   // guards patrol these fields
+  const cap = nearCastle? 2 : Math.min(3+Math.floor(P.level/2), 7);
+  const chance = nearCastle? .025 : Math.min(.06+.012*(P.level-1), .14);
+  const near=monsters.filter(m=>Math.abs(m.x-P.x)<16&&Math.abs(m.y-P.y)<16).length;
+  if(near>=cap || R()>chance) return;
+  const tbl=spawnTable();
+  const total=tbl.reduce((s,t)=>s+t[1],0);
+  let pick=R()*total, key=tbl[0][0];
+  for(const[k,wt]of tbl){ pick-=wt; if(pick<=0){key=k;break;} }
+  const def=MONST[key];
+  if(def.night && !isNight()) return;
+  for(let tries=0;tries<24;tries++){
+    const ang=R()*Math.PI*2, r=ri(7,11);
+    const x=clamp(Math.round(P.x+Math.cos(ang)*r),1,W-2);
+    const y=clamp(Math.round(P.y+Math.sin(ang)*r),1,H-2);
+    const t=gw(x,y);
+    const ok=def.water? (t===T.WATER||t===T.DEEP) : (t===T.GRASS||t===T.FOREST||t===T.HILLS||t===T.SAND||t===T.SWAMP);
+    if(ok && !monsterAt(x,y)){
+      const sc=Math.max(0,P.level-3);   // the world hardens alongside thee
+      monsters.push({key, spr:def.spr, x,y,
+                     name:(sc>=3 && !def.capture ? "dire " : "")+def.name,
+                     hp:def.hp+sc*3, dmg:def.dmg+Math.floor(sc/2),
+                     ac:def.ac, xp:def.xp+sc*4,
+                     gold:[def.gold[0], def.gold[1]+sc*3],
+                     water:def.water, poison:def.poison,
+                     ranged:def.ranged, capture:def.capture});
+      return;
+    }
+  }
+}
+// water monsters only chase ships; cull far ones
+function cullMonsters(){
+  monsters=monsters.filter(m=>Math.abs(m.x-P.x)<30&&Math.abs(m.y-P.y)<30);
+  if(chests.length>12) chests.shift();
+}
+
+function playerDeath(){
+  sfx.die();
+  mode="dead";
+  showOverlay("THOU ART SLAIN",
+    `Darkness takes thee...<br><br>But Lord Lumen's clerics drag thy body from the field.
+     Thou awakenest at Castle Lumen, lighter of purse and pride.`,
+    "— PRESS ANY KEY —");
+}
+function respawn(){
+  P.hp=Math.max(10,Math.floor(P.maxhp/2));
+  P.gold=Math.floor(P.gold/2);
+  P.poison=false; P.onShip=false;
+  if(inDun || (inLoc&&inLoc.raid)){ monsters=wMobs||[]; chests=wChests||[]; wMobs=wChests=null; inDun=null; }
+  inLoc=null;
+  P.x=CASTLE.x; P.y=CASTLE.y+2;
+  monsters=monsters.filter(m=>Math.abs(m.x-P.x)>16||Math.abs(m.y-P.y)>16);
+  mode="play"; hideOverlay(); render();
+}
+
+//---------------------------------------------------------------
+// 14. World tick
+//---------------------------------------------------------------
+function poisonPlayer(text){
+  if(P.poison) return;
+  P.poison=true; P.poisonT=turns;
+  msg(text,"m-bad"); sfx.hurt();
+}
+function tick(){
+  turns++;
+  // food
+  if(turns%4===0){
+    if(P.food>0) P.food--;
+    else { P.hp--; if(turns%8===0) msg("Thou art starving!","m-bad"); }
+  }
+  if(P.poison){
+    if(turns-(P.poisonT||0)>30){ P.poison=false; msg("The venom runs its course. Thou art well again.","m-good"); }
+    else if(turns%3===0){ P.hp--; if(turns%9===0) msg("The poison burns...","m-bad"); }
+  }
+  if(P.hp<=0){ playerDeath(); render(); return; }
+  monsterTurn();
+  if((mode==="play"||mode==="won") && !inDun && !inLoc) { spawnMonsters(); cullMonsters(); }
+  // moored ships slowly mend
+  if(turns%4===0) ships.forEach((s,i)=>{ if(!(P.onShip&&i===P.shipIdx) && s.hull<s.maxhull) s.hull++; });
+  // all eight captains beaten → the Pirate King himself marches
+  if(!inLoc && !inDun && !P.finalDone && !P.finalSiege && (P.pirateWar||0)>=8){
+    P.finalSiege=true; P.siege=null;
+    msg("The horizon darkens with sails — the Pirate King and his whole fleet march on CASTLE LUMEN!","m-bad");
+    msg("(The final battle of the pirate war awaits at the castle gate.)","m-sys");
+    sfx.die();
+  }
+  // a defiled shrine bleeds virtue
+  if(P.desec && turns%25===0){
+    const dv=P.desec.v;
+    if(P.virtues[dv]>0){
+      P.virtues[dv]--;
+      if(turns%100===0) msg(`The defiled Shrine of ${VIRTUES[dv]} gnaws at thy spirit...`,"m-bad");
+      renderStats();
+    }
+  }
+  // cultists defile the weakest shrine
+  if(!inLoc && !inDun && !P.desec && !P.finalSiege
+     && turns>600 && turns-(P.lastDesec||0)>800 && R()<1/400){
+    let v=0; for(let i=1;i<8;i++) if(P.virtues[i]<P.virtues[v]) v=i;
+    P.desec={v};
+    msg(`Dark whispers ride the wind: cultists defile the Shrine of ${VIRTUES[v]}!`,"m-bad");
+    msg("(Thy virtue decays while it festers. Reconsecrate it — press E upon the shrine.)","m-sys");
+    sfx.hurt();
+  }
+  // the dragon wakes
+  if(!inLoc && !inDun && !P.dragonAwake && !P.dragonSlain && turns>900 && R()<1/400){
+    P.dragonAwake=true;
+    msg("A shadow crosses the sun. VARKUL, fire of the peaks, has WOKEN!","m-bad");
+    msg("(His lair smokes in the mountains. His hunger will find the towns.)","m-sys");
+    sfx.die();
+  }
+  // the dragon burns a town
+  if(!inLoc && !inDun && P.dragonAwake && !P.dragonSlain && !P.siege
+     && turns-(P.lastSiege||0)>500 && R()<1/250){
+    P.siege={town:ri(0,1), fire:true, since:turns};
+    msg(`VARKUL descends upon ${LOCS[TOWN_KEYS[P.siege.town]].name} — the town BURNS!`,"m-bad");
+    sfx.die();
+  }
+  // a pale ship rides the night fog
+  if(ghostShip && !inLoc && !inDun){
+    if(!isNight()){ ghostShip=null; msg("The pale ship thins into the morning fog, and is gone.","m-sys"); }
+    else if(turns%2===0){
+      const d=Object.values(DIRS)[Math.floor(R()*4)];
+      if(WALK_SHIP.has(gw(ghostShip.x+d[0],ghostShip.y+d[1]))){ ghostShip.x+=d[0]; ghostShip.y+=d[1]; }
+    }
+  }
+  if(!ghostShip && !inLoc && !inDun && P.onShip && isNight()
+     && turns-(P.lastGhost||0)>400 && R()<1/60){
+    for(let i=0;i<200;i++){
+      const ang=R()*Math.PI*2, r=ri(4,7);
+      const x=Math.round(P.x+Math.cos(ang)*r), y=Math.round(P.y+Math.sin(ang)*r);
+      if(WALK_SHIP.has(gw(x,y))){
+        ghostShip={x,y}; P.lastGhost=turns;
+        msg("A pale ship slides out of the fog, sails full on a dead wind...","m-blue");
+        msg("(Draw alongside and press B to board her — if thou darest.)","m-sys");
+        sfx.gate();
+        break;
+      }
+    }
+  }
+  // the risen captains gather
+  if(!inLoc && !inDun && !P.risen && !P.risenDone && P.finalDone && (P.undeadWar||0)>=1 && R()<1/350){
+    P.risen=true;
+    msg("A cold whisper: \"The Barrow King remembers the men thou sentest him.\"","m-bad");
+    msg("(Eight graves have opened at the Silver Barrow. Go, and end them again.)","m-sys");
+    sfx.die();
+  }
+  // treachery stirs in the castle
+  if(!inLoc && !inDun && !P.plot && !P.plotDone && (P.pirateWar||0)>=2 && turns>800 && R()<1/350){
+    const t1=ri(0,5); let t2=ri(0,5); while(t2===t1) t2=ri(0,5);
+    P.plot={traitors:[t1,t2]};
+    msg("A royal runner finds thee: \"Treachery in Castle Lumen! Two guards conspire!\"","m-bad");
+    msg("(Lord Lumen bids thee: question the guards, find the VAULT KEYS they stole — and strike true.)","m-sys");
+  }
+  // the shrines call the worthy to trial
+  if(!inLoc && !inDun && !P.trialDone && !P.trialHinted && P.virtues.every(v=>v>=70)){
+    P.trialHinted=true;
+    msg("The eight shrines sing as one: COME TO THE CIRCLE OF LIGHT.","m-gold");
+    msg("(Press E at any shrine to face thy Trial.)","m-sys");
+    sfx.virtue();
+  }
+  // the moons darken: the dead breach a moongate
+  if(!inLoc && !inDun && !P.moonCurse && !P.finalSiege
+     && turns>500 && turns-(P.lastCurse||0)>700 && R()<1/350){
+    P.moonCurse={gate: moonPhase()};
+    msg("The moons turn blood-dark! The dead pour through a moongate...","m-bad");
+    msg("(A corrupted gate burns red in the wilds. Enter it to drive back the dead.)","m-sys");
+    sfx.die();
+  }
+  // pirates strike at the mainland
+  if(!inLoc && !inDun && !P.siege && !P.finalSiege && !P.finalDone
+     && turns>400 && turns-(P.lastSiege||0)>600 && R()<1/300){
+    P.siege={town:ri(0,1), since:turns};
+    msg(`Word travels fast: pirate reavers besiege ${LOCS[TOWN_KEYS[P.siege.town]].name}!`,"m-bad");
+    msg("(Go to its gate and press E to fight for the town.)","m-sys");
+    sfx.hurt();
+  }
+  // the whirlpool wanders the deep
+  if(whirl && !inLoc && !inDun){
+    if(turns%2===0){
+      const d=Object.values(DIRS)[Math.floor(R()*4)];
+      const nx=whirl.x+d[0], ny=whirl.y+d[1];
+      if(WALK_SHIP.has(gw(nx,ny))){ whirl.x=nx; whirl.y=ny; }
+    }
+    if(P.onShip && whirl.x===P.x && whirl.y===P.y && mode!=="dead"){
+      msg("The whirlpool seizes thy ship!","m-bad"); sfx.gate();
+      hullHit(ri(5,15),"whirlpool");
+      if(P.onShip){
+        for(let i=0;i<400;i++){
+          const x=ri(4,W-5), y=ri(4,H-5);
+          if(WALK_SHIP.has(gw(x,y)) && (x-P.x)**2+(y-P.y)**2>400){
+            const s=curShip(); P.x=s.x=x; P.y=s.y=y; break;
+          }
+        }
+        msg("...it spits thee out in strange waters!","m-blue");
+      }
+    }
+  }
+  render();
+}
+
+//---------------------------------------------------------------
+// 15. Commands
+//---------------------------------------------------------------
+function cmdTalk(dx,dy){
+  const n=npcAt(P.x+dx,P.y+dy);
+  if(!n){ msg("Funny — no response.","m-sys"); return; }
+  msg(n.greet,"m-blue");
+  msg(`(Speak with ${n.name} — try NAME, JOB, MANTRA... BYE ends.)`,"m-sys");
+  talkLoop(n);
+}
+function talkLoop(n){
+  openPrompt("You say:",(text)=>{
+    const q=text.toLowerCase();
+    if(!q || q==="bye"||q==="farewell"){ msg(`"${q==="" ? "..." : "Fare thee well."}"`,"m-say"); render(); return; }
+    let handled=false;
+    if(q.includes("name")){ msg(`"I am ${n.name}."`,"m-say"); handled=true; }
+    else if(q.includes("health")){ msg(`"I am well, thank thee."`,"m-say"); handled=true; }
+    else {
+      for(const key in n.lines){
+        if(q.includes(key)){
+          const v=n.lines[key];
+          if(typeof v==="string") msg(`"${v}"`,"m-say");
+          else if(typeof v==="function") v();
+          else if(v.shop){ openShop(v.shop,n); return; }
+          else if(v.ask){ askYesNo(v.ask,v.yes,v.no,()=>{ if(!(inLoc&&inLoc.raid)) talkLoop(n); }); return; }
+          handled=true; break;
+        }
+      }
+    }
+    if(!handled) msg(`"That I cannot help thee with."`,"m-sys");
+    talkLoop(n);
+  });
+}
+function askYesNo(question,yes,no,after){
+  msg(question,"m-blue");
+  openPrompt("Y/N:",(t)=>{
+    const v=t.toLowerCase();
+    if(v.startsWith("y")) yes(); else if(v.startsWith("n")) no();
+    else msg("They await a straight answer... but shrug.","m-sys");
+    if(after) after();
+  });
+}
+function openShop(kind,n){
+  const s=SHOPS[kind];
+  msg(`— ${s.title} —`,"m-gold");
+  s.items.forEach((it,i)=>msg(`  ${i+1}. ${it.name} — ${it.cost}g`,"m-say"));
+  openPrompt("Buy #:",(t)=>{
+    const i=parseInt(t)-1;
+    if(isNaN(i)||!s.items[i]){ msg("\"Another time, then.\"","m-sys"); if(n) talkLoop(n); return; }
+    const it=s.items[i];
+    if(P.gold<it.cost){ msg("\"Thou hast not the gold!\"","m-bad"); if(n) talkLoop(n); return; }
+    P.gold-=it.cost; it.buy(); sfx.gold();
+    msg(`Thou buyest ${it.name}.`,"m-gold");
+    // honesty test: merchant sometimes gives too much change
+    if(!P.honestyFlag && R()<.35 && it.cost>=12){
+      P.honestyFlag=true;
+      const extra=Math.min(10,Math.max(3,Math.floor(it.cost*.3)));
+      msg(`The merchant miscounts and hands thee ${extra} gold too many!`,"m-gold");
+      askYesNo("Keep the extra coin? (Y/N)",
+        ()=>{ P.gold+=extra; virtue(0,-6,"Thou pocketest the coin in silence."); P.honestyFlag=false; if(n) talkLoop(n); },
+        ()=>{ virtue(0,6,"\"Bless thy honest heart!\" the merchant cries."); P.honestyFlag=false; if(n) talkLoop(n); });
+      renderStats(); return;
+    }
+    renderStats();
+    if(n) talkLoop(n);
+  });
+}
+
+function fireCannon(dx,dy){
+  beep(60,.25,.09,"sawtooth");
+  msg("Thou firest a broadside!","m-say");
+  for(let i=1;i<=3;i++){
+    const x=P.x+dx*i, y=P.y+dy*i;
+    const m=monsterAt(x,y);
+    if(m){
+      const d=ri(12,30);
+      m.hp-=d; sfx.hit();
+      msg(`The cannonball smashes ${mN(m)} for ${d}!`,"m-good");
+      if(m.hp<=0) killMonster(m);
+      tick(); return;
+    }
+    if(!WALK_SHIP.has(gw(x,y))){ msg("The shot splinters against the shore.","m-sys"); tick(); return; }
+  }
+  msg("The shot splashes into the sea.","m-sys");
+  tick();
+}
+function cmdAttack(dx,dy){
+  if(P.onShip && !inLoc){ fireCannon(dx,dy); return; }
+  if(inLoc){
+    const n=npcAt(P.x+dx,P.y+dy);
+    if(n && n.plotGuard){
+      if(n.traitor){
+        // both conspirators drop the act
+        const pair=inLoc.npcs.filter(g=>g.plotGuard&&g.traitor);
+        inLoc.npcs=inLoc.npcs.filter(g=>!(g.plotGuard&&g.traitor));
+        wMobs=monsters; wChests=chests;
+        monsters=pair.map(g=>({key:"traitor",name:g.name+" the traitor",spr:"guard",
+          x:g.x,y:g.y,hp:30,dmg:14,ac:3,xp:45,gold:[20,40],water:false,proper:true}));
+        chests=[];
+        inLoc.raid="plot";
+        msg(`${n.name} snarls — the mask drops! Both conspirators draw steel!`,"m-bad");
+        sfx.hurt(); tick(); return;
+      }
+      virtue(3,-12,`${n.name} was INNOCENT! The court gasps in horror.`);
+      virtue(5,-5);
+      msg(`${n.name} flees, wounded and wronged. The real traitors smirk.`,"m-bad");
+      inLoc.npcs=inLoc.npcs.filter(x=>x!==n);
+      tick(); return;
+    }
+    if(n){
+      virtue(3,-10,`Thou strikest ${n.name}! The town cries murder!`);
+      virtue(1,-5);
+      msg(`${n.name} flees from thee.`,"m-bad");
+      inLoc.npcs=inLoc.npcs.filter(x=>x!==n);
+      if(inLoc.key==="town2"){
+        P.skullWrath=true; P.skullRespect=false;
+        msg("Skullhaven will remember this...","m-bad");
+      }
+      tick(); return;
+    }
+    if(!inLoc.raid){ msg("Thou swingest at air.","m-sys"); return; }
+  }
+  const m=monsterAt(P.x+dx,P.y+dy);
+  if(!m){ msg("Thou swingest at air.","m-sys"); tick(); return; }
+  attackMonster(m); tick();
+}
+
+function cmdGet(){
+  const c=chests.find(c=>c.x===P.x&&c.y===P.y);
+  if(!c){ msg("Nothing here to take.","m-sys"); return; }
+  chests=chests.filter(x=>x!==c);
+  if(R()<.15) poisonPlayer("A poison needle pricks thee!");
+  P.gold+=c.gold; sfx.gold();
+  msg(`Thou openest the chest: ${c.gold} gold!`,"m-gold");
+  if(c.honor && inDun){
+    P.dunHonor=P.dunHonor||{};
+    if(!P.dunHonor[inDun.idx]){
+      P.dunHonor[inDun.idx]=true;
+      virtue(5,4,`Thou hast braved the depths of ${DUNGEONS[inDun.idx].name} — a deed of honor!`);
+    }
+  }
+  tick();
+}
+
+function cmdMeditate(){
+  if(inLoc || inDun || gw(P.x,P.y)!==T.SHRINE){ msg("This is no place of power.","m-sys"); return; }
+  const i=shrineIndex(P.x,P.y);
+  if(P.desec && P.desec.v===i)
+    return msg("The shrine is DEFILED — no prayer can pass. Confront the cult with E.","m-bad");
+  const cdKey="s"+i;
+  msg(`Thou kneelest at the Shrine of ${VIRTUES[i]}...`,"m-blue");
+  openPrompt("Mantra:",(t)=>{
+    if(t.trim().toUpperCase()!==MANTRAS[i]){
+      msg("The shrine is silent. That mantra is not its own.","m-sys");
+      msg("(Sages, bards and others in towns teach the mantras.)","m-sys");
+      render(); return;
+    }
+    if(P.shrineCd[cdKey] && turns-P.shrineCd[cdKey]<150){
+      msg("The shrine's power is spent. Return after more wandering.","m-sys");
+      render(); return;
+    }
+    P.shrineCd[cdKey]=turns;
+    sfx.virtue();
+    msg("Light floods thy mind. The virtue answers!","m-good");
+    virtue(i,10);
+    if(i!==6) virtue(6,2);   // spirituality echoes all meditation
+    virtue(5,2);             // honor for the pilgrimage
+    for(let k=0;k<20;k++) tick();
+  });
+}
+
+function cmdBoard(){
+  if(inLoc||inDun) return msg("No vessel here.","m-sys");
+  if(ghostShip && Math.abs(ghostShip.x-P.x)+Math.abs(ghostShip.y-P.y)===1){
+    startRaid("deck","ghostship");
+    return;
+  }
+  const i=ships.findIndex((s,idx)=>idx!==P.shipIdx && Math.abs(s.x-P.x)+Math.abs(s.y-P.y)===1);
+  if(i<0) return msg(P.onShip?"No other vessel within reach.":"No vessel within reach.","m-sys");
+  if(P.onShip){   // cross from deck to deck
+    P.shipIdx=i; P.x=ships[i].x; P.y=ships[i].y;
+    msg(`Thou crossest to the other vessel (hull ${ships[i].hull}/${ships[i].maxhull}).`,"m-blue");
+  } else {
+    P.onShip=true; P.shipIdx=i; P.x=ships[i].x; P.y=ships[i].y;
+    msg(`Thou boardest the ship (hull ${ships[i].hull}/${ships[i].maxhull}). The sails catch wind!`,"m-blue");
+  }
+  tick();
+}
+function cmdExitShip(){
+  if(inLoc||inDun) return msg("Not here.","m-sys");
+  if(!P.onShip) return msg("Thou art not aboard.","m-sys");
+  for(const[dx,dy]of Object.values(DIRS)){
+    const t=gw(P.x+dx,P.y+dy);
+    if(WALK_LAND.has(t)){
+      const s=curShip(); s.x=P.x; s.y=P.y;
+      P.onShip=false; P.shipIdx=-1;
+      P.x+=dx; P.y+=dy;
+      msg("Thou steppest ashore.","m-sys");
+      tick(); return;
+    }
+  }
+  msg("No shore within reach.","m-sys");
+}
+
+function cmdCamp(){
+  if(inLoc) return msg("Rest at an inn — or outside town.","m-sys");
+  if(P.onShip) return msg("Thou canst not camp upon the waves.","m-sys");
+  const near=monsters.some(m=>Math.abs(m.x-P.x)<5&&Math.abs(m.y-P.y)<5);
+  if(near) return msg("Monsters prowl too close to rest!","m-bad");
+  if(P.food<5) return msg("Thou hast not food enough to camp.","m-bad");
+  // a heavy purse sleeps loud
+  if(!inDun && P.gold>=300 && turns-(P.lastAmbush||0)>300 && R()<.25){
+    P.lastAmbush=turns;
+    startRaid("camp","ambush");
+    return;
+  }
+  P.food-=5;
+  const heal=ri(10,25);
+  P.hp=Math.min(P.maxhp,P.hp+heal);
+  msg(`Thou makest camp and healest ${heal} HP.`,"m-good");
+  for(let k=0;k<10;k++){ turns++; }
+  if(!inDun && !inLoc) spawnMonsters();
+  render();
+}
+
+function cmdZtats(){
+  msg("— ZTATS —","m-gold");
+  msg(`Str of arm: ${WEAPONS[P.weapon].name} (${WEAPONS[P.weapon].min}-${WEAPONS[P.weapon].max}) · ${ARMORS[P.armor].name} (+${ARMORS[P.armor].def})`,"m-say");
+  msg(`Virtues: ${VIRTUES.map((v,i)=>`${v.slice(0,4)} ${P.virtues[i]}`).join(" · ")}`,"m-say");
+  const proven=Object.keys(P.shrineCd||{}).map(k=>+k.slice(1)).sort((a,b)=>a-b);
+  if(proven.length)
+    msg(`Mantras proven: ${proven.map(i=>`${MANTRAS[i]}=${VIRTUES[i].slice(0,4)}`).join(" · ")}`,"m-blue");
+  msg(`Shrines answer at 80+ in all eight virtues → Sainthood.`,"m-sys");
+}
+
+//---------------------------------------------------------------
+// 16. Save / load
+//---------------------------------------------------------------
+const SAVE_KEY="altima-save";
+function save(){
+  try{
+    const parked = inDun || (inLoc&&inLoc.raid);
+    localStorage.setItem(SAVE_KEY,JSON.stringify({
+      P, turns, ships, whirl, ghostShip,
+      monsters: parked? wMobs : monsters,
+      chests:   parked? wChests : chests,
+      inLocRet: inLoc? inLoc.ret : null,
+      inDunRet: inDun? inDun.ret : null}));
+    msg("Game saved.","m-gold");
+  }catch(e){ msg("Save failed.","m-bad"); }
+}
+// saves are untrusted input: clamp every number, drop every malformed entity
+function sNum(v,def,lo,hi){ v=+v; return Number.isFinite(v)? clamp(Math.round(v),lo,hi) : def; }
+function sPos(o){ return o && Number.isFinite(+o.x) && Number.isFinite(+o.y)
+  ? {x:sNum(o.x,0,0,W-1), y:sNum(o.y,0,0,H-1)} : null; }
+function load(){
+  try{
+    const d=JSON.parse(localStorage.getItem(SAVE_KEY));
+    if(!d || typeof d.P!=="object" || !d.P) return false;
+    P=d.P;
+    P.x=sNum(P.x,CASTLE.x,0,W-1); P.y=sNum(P.y,CASTLE.y+2,0,H-1);
+    P.level=sNum(P.level,1,1,99);
+    P.maxhp=sNum(P.maxhp,60,10,99999);
+    P.hp=sNum(P.hp,P.maxhp,1,P.maxhp);
+    P.xp=sNum(P.xp,0,0,1e9); P.gold=sNum(P.gold,0,0,1e9); P.food=sNum(P.food,0,0,1e9);
+    P.weapon=sNum(P.weapon,1,0,WEAPONS.length-1);
+    P.armor=sNum(P.armor,1,0,ARMORS.length-1);
+    P.virtues=(Array.isArray(P.virtues)&&P.virtues.length===8)
+      ? P.virtues.map(v=>sNum(v,25,0,100)) : [25,25,25,25,25,25,25,25];
+    if(typeof P.shrineCd!=="object"||!P.shrineCd) P.shrineCd={};
+    if(P.siege && !(Number.isInteger(P.siege.town)&&P.siege.town>=0&&P.siege.town<=1)) P.siege=null;
+    if(P.moonCurse && !(Number.isInteger(P.moonCurse.gate)&&GATES[P.moonCurse.gate])) P.moonCurse=null;
+    if(P.desec && !(Number.isInteger(P.desec.v)&&P.desec.v>=0&&P.desec.v<8)) P.desec=null;
+    if(P.plot && !Array.isArray(P.plot.traitors)) P.plot=null;
+    const okMob=m=>m && SPRC[m.spr] && typeof m.name==="string" && m.name.length<64
+      && Number.isFinite(+m.x) && Number.isFinite(+m.y) && Number.isFinite(+m.hp)
+      && Array.isArray(m.gold);
+    monsters=(Array.isArray(d.monsters)?d.monsters:[]).filter(okMob).slice(0,64);
+    chests=(Array.isArray(d.chests)?d.chests:[]).filter(c=>sPos(c)&&Number.isFinite(+c.gold)).slice(0,64);
+    ships=(Array.isArray(d.ships)?d.ships:(d.shipObj?[{x:d.shipObj.x,y:d.shipObj.y,hull:50,maxhull:50}]:[]))
+      .filter(s=>sPos(s)).map(s=>({x:sNum(s.x,0,0,W-1),y:sNum(s.y,0,0,H-1),
+        hull:sNum(s.hull,50,1,999),maxhull:sNum(s.maxhull,50,1,999),ghost:!!s.ghost})).slice(0,16);
+    whirl=sPos(d.whirl); ghostShip=sPos(d.ghostShip);
+    turns=sNum(d.turns,0,0,1e9);
+    P.onShip=!!P.onShip;
+    P.shipIdx=sNum(P.shipIdx,-1,-1,ships.length-1);
+    if(P.onShip && !ships[P.shipIdx]) P.onShip=false, P.shipIdx=-1;
+    inLoc=null; inDun=null; wMobs=wChests=null;
+    const lr=sPos(d.inLocRet), dr=sPos(d.inDunRet);
+    if(lr){ P.x=lr.x; P.y=lr.y; }
+    if(dr){ P.x=dr.x; P.y=dr.y; }
+    if(!WALK_LAND.has(gw(P.x,P.y)) && !(P.onShip&&WALK_SHIP.has(gw(P.x,P.y)))){ P.x=CASTLE.x; P.y=CASTLE.y+2; }
+    msg("Game restored.","m-gold");
+    return true;
+  }catch(e){ return false; }
+}
+
+//---------------------------------------------------------------
+// 17. Input
+//---------------------------------------------------------------
+const KEYDIR={ArrowUp:"up",ArrowDown:"down",ArrowLeft:"left",ArrowRight:"right",
+              w:"up",s:"down",a:"left",d:"right",W:"up",S:"down",A:"left",D:"right"};
+document.addEventListener("keydown",e=>{
+  if(mode==="text") return; // input has focus
+  if(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"," "].includes(e.key)) e.preventDefault();
+
+  if(mode==="title"){
+    hideOverlay();
+    if(!load()) newGame();
+    mode="play"; render();
+    return;
+  }
+  if(mode==="dead"){ respawn(); return; }
+  if(mode==="won"){ mode="play"; hideOverlay(); render(); return; }
+  if(mode==="help"){ mode="play"; hideOverlay(); render(); return; }
+
+  if(mode==="dir"){
+    const d=KEYDIR[e.key];
+    mode="play";
+    const fn=pending&&pending.fn; pending=null;
+    if(!d){ msg("Never mind.","m-sys"); return; }
+    const [dx,dy]=DIRS[d];
+    if(fn) fn(dx,dy);
+    return;
+  }
+
+  if(mode!=="play") return;
+
+  const dir=KEYDIR[e.key];
+  // WASD conflicts with A=attack; use lowercase wasd only when not modifier
+  if(e.key.startsWith("Arrow")&&dir){ tryMove(...DIRS[dir]); return; }
+
+  switch(e.key.toLowerCase()){
+    case "w": tryMove(0,-1); break;
+    case "s":
+      if(e.shiftKey){ save(); }
+      else tryMove(0,1);
+      break;
+    case "a": tryMove(-1,0); break;
+    case "d": tryMove(1,0); break;
+    case " ": msg("Pass.","m-sys"); tick(); break;
+    case "t": {
+      const adj=Object.values(DIRS).filter(([dx,dy])=>npcAt(P.x+dx,P.y+dy));
+      if(adj.length===1) cmdTalk(adj[0][0],adj[0][1]);
+      else { mode="dir"; pending={fn:cmdTalk}; msg("Talk — which direction?","m-sys"); }
+      break;
+    }
+    case "f": mode="dir"; pending={fn:cmdAttack}; msg("Attack — which direction?","m-sys"); break;
+    case "e": if(inDun) dungeonLadder(); else enterLoc(); break;
+    case "g": cmdGet(); break;
+    case "m": cmdMeditate(); break;
+    case "b": cmdBoard(); break;
+    case "x": cmdExitShip(); break;
+    case "h": cmdCamp(); break;
+    case "z": cmdZtats(); break;
+    case "?": case "/":
+      mode="help";
+      showOverlay("COMMANDS",
+        `Arrows / WASD — move & bump-attack<br>
+         T — talk (then direction) · F — attack, or cannons at sea<br>
+         E — enter town/castle/dungeon, climb ladders<br>
+         M — meditate at shrine · G — get chest<br>
+         B — board or cross to adjacent ship · X — go ashore · H — camp<br>
+         Z — ztats · Shift+S — save · Space — pass<br><br>
+         Raise all eight virtues to 80 to become the Saint.<br>
+         Dungeons hide treasure. Sunk pirates yield their ships.<br>
+         Islands at sea hold a pirate port, rich caves — and a shrine.`,
+        "— PRESS ANY KEY —");
+      break;
+  }
+});
+
+//---------------------------------------------------------------
+// 18. Boot
+//---------------------------------------------------------------
+setInterval(()=>{ animF^=1; if(mode!=="title") render(); },500);
+msg("ALTIMA","m-gold");
+msg("Press any key to begin.","m-sys");
+</script>
+</body>
+</html>
