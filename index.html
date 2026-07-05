@@ -669,6 +669,8 @@ const RUMORS=[
   "They rebuilt every town but one. Vainglory got what pride pays for — go see what's left, if thy soul can bear it.",
 ];
 function innDrinks(){
+  if(P.thief && inLoc && P.thief.town===inLoc.key && turns<P.thief.until)
+    return msg('"The house drinks with honest folk." Backs turn toward thee.',"m-bad");
   if(P.gold<5) return msg('"Five gold the round, friend. Come back heavier."',"m-sys");
   P.gold-=5; sfx.gold(); renderStats();
   msg("Thou standest the house a round. Mugs rise; tongues loosen.","m-gold");
@@ -894,10 +896,16 @@ town1:{
      lines:{ job:"I mock the mighty! Riddle me: art thou the greatest hero this land hath ever seen?",
        riddle:{ask:"\"Art thou the greatest hero this land hath ever seen?\" (Y/N)",
                yes:()=>virtue(7,-5,"\"HA! Pride goeth before the fall!\" Fenn capers away."),
-               no :()=>virtue(7,5,"\"Wisely spoken!\" Fenn bows low.")},
+               no :()=>{ if(P.fennT!==undefined && turns-P.fennT<100)
+                   return msg('"Still humble? Good, good. Come back when it wears off."',"m-say");
+                 P.fennT=turns;
+                 virtue(7,5,"\"Wisely spoken!\" Fenn bows low."); }},
        mantra:{ask:"\"The mantra of Humility for a straight answer! Art thou the greatest hero this land hath ever seen?\" (Y/N)",
                yes:()=>virtue(7,-5,"\"HA! Then thou needest it not, o mighty one!\""),
-               no :()=>{virtue(7,5,"\"Then thou art ready: the mantra is MEK.\"");}} }},
+               no :()=>{ if(P.fennT!==undefined && turns-P.fennT<100){
+                   msg("\"The mantra is MEK — and thou knewest that, didn\'t thou.\"","m-say"); return; }
+                 P.fennT=turns;
+                 virtue(7,5,"\"Then thou art ready: the mantra is MEK.\"");}} }},
    "4":{name:"Hilda the Armorer",spr:"merchant",peace:true,
      greet:"Racks of armor gleam in lamplight.",
      lines:{ job:"Say BUY, and walk out safer than thou walked in.",
@@ -1207,7 +1215,10 @@ vainglory:{
      lines:{ job:"I wept for Vainglory in life. Death has not changed my duties.",
        test:{ask:'"Tell me true, traveler — art thou better than we were?" (Y/N)',
          yes:()=>virtue(7,-5,'"So said we all," she whispers, and turns away.'),
-         no :()=>virtue(7,6,'"Then perhaps the land learns." Her tears glimmer like a blessing.')},
+         no :()=>{ if(P.shadeT!==undefined && turns-P.shadeT<100)
+             return msg('"Thou hast said so. The saying is not the being — walk a while first."',"m-say");
+           P.shadeT=turns;
+           virtue(7,6,'"Then perhaps the land learns." Her tears glimmer like a blessing.'); }},
        humility:"Its rune sleeps on a small far island. Humility keeps no mansions." }},
    "3":{name:"Shade of a Builder",spr:"ghost",peace:true,always:1,
      greet:"A broad ghost stacks stones that fall through his hands.",
