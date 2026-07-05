@@ -24,6 +24,7 @@
   #portrait{position:absolute; top:6px; right:8px; text-align:center; background:#10101e;
             border:1px solid var(--border); border-radius:4px; padding:4px 6px 2px; z-index:3;}
   #portrait.off{display:none;}
+  #logbox.talking #log{margin-right:96px;}
   #portrait canvas{image-rendering:pixelated; display:block; margin:0 auto;}
   #portrait .pnm{color:var(--accent); font-size:10px; max-width:76px; line-height:1.2; padding-top:2px;}
   #choices{display:none; flex-wrap:wrap; gap:4px; margin-top:4px;}
@@ -338,6 +339,8 @@ cat   :{px:["........",".e.e....",".eee....",".eee..t.",".eeeeet.",".ee..e..",".
         pal:{".":null,"e":"#9a9aa8","t":"#7a7a88"}},
 chicken:{px:["........","..c.....",".www....","wwwwb...",".www....","..ww....","..ll....","........"],
         pal:{".":null,"c":"#e04040","w":"#f0f0e8","b":"#f0a030","l":"#e0b030"}},
+child :{px:["........","........","..hh....","..ff....",".bbbb...","..bb....","..l.l...","........"],
+        pal:{".":null,"h":"#6b3f1c","f":"#eec39a","b":"#4a90d9","l":"#3a3a3a"}},
 cave  :{px:["........","..aaaa..",".aaaaaa.","aaa00aaa","aa0000aa","aa0000aa","aaaaaaaa","........"],
         pal:{".":"#2e9a2e","a":"#8a8a8a","0":"#0a0a0a"}},
 dwall :{px:["bbbbbbbb","b...b...","bbbbbbbb","..b...b.","bbbbbbbb","b...b...","bbbbbbbb","..b...b."],
@@ -1105,7 +1108,7 @@ goldport:{
   "g#########,,,~~~~~g",
   "g#......1D,,,~~~~~g",
   "g#########,,.....~g",
-  "g,,,,,,,,,,,,~~~~~g",
+  "g,,,,,,,8,,,,~~~~~g",
   "g@,,,,3,,,,,,~~~~~g",
   "g,,,,,,,,,,,,~~~~~g",
   "g#########,,,~~~~~g",
@@ -1156,6 +1159,19 @@ goldport:{
        honesty:"Kept an honest ledger forty years. The rune of it sits under the bard's feet in Moonhaven, they say." }},
    "6":mkInn("Innkeeper Sorrel","A weathered innkeeper counts mugs like a dockmaster counts hulls.",10,
      "A drowned captain keeps the finest sextant ever made. Divers talk. Drunk divers talk more."),
+   "8":{name:"Brother Hollow",spr:"mage",peace:true,always:1,
+     greet:'A robed figure preaches to the empty air: "The shrines LIE, friends."',
+     lines:{
+       job:"I carry the Veil's truth from port to port: virtue is a cage, and the castle holds the key.",
+       veil:"When a shrine sickens, ask WHO benefits. We merely... hasten the question.",
+       shrine:"Stone and mantras. The Veil will pull them down one by one — watch thy weakest, friend.",
+       free:{ask:'"Cast off thy chains — profess the Veil and be FREE! Wilt thou?" (Y/N)',
+         yes:()=>virtue(6,-6,'"Welcome, unbound." A cold wind touches the back of thy neck.'),
+         no :()=>{ if(P.veilT!==undefined && turns-P.veilT<100)
+             return msg('"Still caged. Still smug." He turns his back.',"m-say");
+           P.veilT=turns;
+           virtue(6,4,'"Then rot in thy cage." Thy spirit holds fast against him.'); }},
+     }},
   }},
 stonevale:{
   name:"Stonevale",
@@ -1393,19 +1409,19 @@ const TOWN_KEYS=["town0","town1","willowdale","goldport","stonevale","town2","va
   A("castle","Lumen",{always:1}); A("castle","Gareth",{always:1}); A("castle","Souls",{always:1});
   A("castle","Cedric",{h:[17,3]}); A("castle","Pip",{s:[7,7],h:[2,10]});
   A("town0","Ana",{always:1,s:[3,17],h:[9,16]}); A("town0","Tam",{s:[5,17],h:[5,17]});
-  A("town0","Lyra",{s:[2,17],h:[2,17]}); A("town0","Marla",{h:[14,16]});
-  A("town1","Grimm",{s:[2,14]}); A("town1","Wystan",{s:[3,14],h:[9,13]});
+  A("town0","Lyra",{s:[2,17],h:[2,17],amb:{phase:"social",text:"~ Lyra strikes up a reel; mugs thump the tables ~",notes:[523,659,784]}}); A("town0","Marla",{h:[14,16]});
+  A("town1","Grimm",{s:[2,14],amb:{phase:"work",text:"CLANG. CLANG. Grimm's hammer rings off the anvil.",notes:[880,660]}}); A("town1","Wystan",{s:[3,14],h:[9,13]});
   A("town1","Fenn",{s:[5,14],h:[14,13]}); A("town1","Hilda",{h:[15,13]});
   A("town1","Roke",{always:1});
   A("willowdale","Etta",{always:1}); A("willowdale","Col",{s:[3,15],h:[9,14]});
   A("willowdale","Bess",{s:[5,15],h:[14,14]}); A("willowdale","Puck",{always:1,s:[2,15]});
-  A("goldport","Hale",{s:[2,16]}); A("goldport","Ives",{s:[3,16],h:[9,15]});
+  A("goldport","Hale",{s:[2,16],amb:{phase:"work",text:"Saw-rasp and tar-smell — Hale's yard hard at work.",notes:[440,415]}}); A("goldport","Ives",{s:[3,16],h:[9,15]});
   A("goldport","Rena",{always:1,s:[5,16]}); A("goldport","Wick",{h:[14,15]});
-  A("town2","Meg",{always:1}); A("town2","Silas",{always:1,s:[7,2],h:[9,15]});
+  A("town2","Meg",{always:1,amb:{phase:"social",text:"Meg slams down a tray of mugs to a roar of cheers.",notes:[392,392]}}); A("town2","Silas",{always:1,s:[7,2],h:[9,15]});
   A("town2","Rafe",{always:1,s:[7,3]}); A("town2","Scab",{always:1,s:[9,3],h:[10,15]});
   A("town2","Salt",{always:1,s:[9,2]});
   A("stonevale","Brakk",{s:[2,16]}); A("stonevale","Iva",{always:1});
-  A("stonevale","Oth",{s:[3,16],h:[9,15]}); A("stonevale","Guss",{s:[5,16]});
+  A("stonevale","Oth",{s:[3,16],h:[9,15]}); A("stonevale","Guss",{s:[5,16],amb:{phase:"work",text:"The smelter roars; Guss feeds it another ingot.",notes:[220,165]}});
 })();
 function npcStep(n,sp){   // first step of the shortest walkable path (interiors are tiny — BFS is cheap)
   return bfsStep(n,sp,true) || bfsStep(n,sp,false);  // route around bodies; queue through them as a last resort
@@ -1834,8 +1850,10 @@ function showPortrait(n){
   pctx.drawImage(SPRC[n.spr],0,0,64,64);
   document.getElementById("pnm").textContent=n.name;
   box.classList.remove("off");
+  document.getElementById("logbox").classList.add("talking");
 }
-function hidePortrait(){ window.__talkN=null; document.getElementById("portrait").classList.add("off"); }
+function hidePortrait(){ window.__talkN=null; document.getElementById("portrait").classList.add("off");
+  document.getElementById("logbox").classList.remove("talking"); }
 function openPrompt(prefix,cb,choices){
   mode="text"; pending={cb};
   ppfx.textContent=prefix;
@@ -1863,6 +1881,7 @@ function closePrompt(){
   const ch=document.getElementById("choices");
   ch.classList.remove("on"); ch.innerHTML="";
   document.getElementById("portrait").classList.add("off");
+  document.getElementById("logbox").classList.remove("talking");
   tin.blur(); mode="play"; pending=null;
 }
 tin.addEventListener("keydown",e=>{
@@ -2264,7 +2283,7 @@ function enterLoc(){
   // living towns keep living things underfoot
   if(TOWN_KEYS.includes(key) && key!=="vainglory"){
     const CRITTERS = key==="town2" ? [["a mangy rat","rat"],["a scarred cat","cat"]]
-      : [["a dog","dog"],["a cat","cat"],["a chicken","chicken"]];
+      : [["a dog","dog"],["a cat","cat"],["a chicken","chicken"],["a child","child"]];
     let placed=0, tries=0;
     while(placed<CRITTERS.length && tries++<200){
       const x=1+Math.floor(R()*(grid[0].length-2)), y=1+Math.floor(R()*(grid.length-2));
@@ -2275,6 +2294,7 @@ function enterLoc(){
         greet: spr==="dog"?"Woof! The dog wags hopefully."
              : spr==="cat"?"Mrow. The cat permits thy presence."
              : spr==="chicken"?"Bwok. The chicken regards thee without respect."
+             : spr==="child"?'"Play swords with me!" The child brandishes a stick heroically.'
              : "Squeak. The rat has seen things.",
         lines:{}});
       placed++;
@@ -3048,6 +3068,15 @@ function tick(){
       if(n.x===sp.x && n.y===sp.y) continue;
       const st=npcStep(n,sp);
       if(st && !npcAt(st.x,st.y) && !(st.x===P.x&&st.y===P.y) && !monsterAt(st.x,st.y)){ n.x=st.x; n.y=st.y; }
+    }
+    // the sounds of honest work (and of taverns at song)
+    if(turns%6===0 && R()<.4){
+      const src=inLoc.npcs.find(n=>n.amb && n.amb.phase===dayPhase()
+        && Math.abs(n.x-P.x)+Math.abs(n.y-P.y)<=6);
+      if(src){
+        msg(src.amb.text,"m-sys");
+        (src.amb.notes||[]).forEach(f=>beep(f,.07,.018,"square"));
+      }
     }
   }
   if((mode==="play"||mode==="won") && !inDun && !inLoc) { spawnMonsters(); cullMonsters(); }
