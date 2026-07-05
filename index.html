@@ -2400,9 +2400,15 @@ function killMonster(m){
   virtue(2, 1);
   const g=ri(m.gold[0],m.gold[1]);
   if(m.capture){
-    ships.push({x:m.x,y:m.y,hull:30,maxhull:50});
-    msg("The pirates strike their colors — their ship is thine to claim!","m-gold");
+    msg("The pirates strike their colors — the ship is thine!","m-gold");
     if(g>0){ P.gold+=g; msg(`Thou findest ${g} gold in her hold.`,"m-gold"); }
+    const sx=m.x, sy=m.y;
+    askYesNo("Claim her as thy prize? (No strips her for salvage)",
+      ()=>{ ships.push({x:sx,y:sy,hull:30,maxhull:50});
+            msg("Thy prize rides at anchor where she struck. (B crosses decks when alongside.)","m-blue"); },
+      ()=>{ const s=45+ri(0,25); P.gold+=s; sfx.gold();
+            msg(`Thou strippest her fittings for ${s} gold; the bare hull slips under.`,"m-gold");
+            renderStats(); });
   }
   else if(g>0 && m.water){ P.gold+=g; msg(`Thou fishest ${g} gold from the wreckage.`,"m-gold"); }
   else if(g>0) chests.push({x:m.x,y:m.y,gold:g});
