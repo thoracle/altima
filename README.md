@@ -36,7 +36,11 @@ thy progress.
   (V toggles music)
 - Living towns: every villager keeps a daily agenda — working by day,
   drinking in the tavern by evening, asleep in a real bed at night
-  (shops keep hours; guards, healers, and pirates never rest)
+  (shops keep hours; guards, healers, and pirates never rest); dogs,
+  cats, and chickens wander the streets; innkeepers rent beds and
+  pour rumors for a round of drinks; unwatched counters tempt thieves
+  (and towns remember a caught one); Skullhaven runs a crooked dice
+  den; and the ruined town of Vainglory keeps its ghosts
 - IM-style dialogue: topics, shop wares, and yes/no questions appear
   as clickable reply chips (numbers and free typing still work) —
   secrets still hide behind unlisted words, and the folk greet a

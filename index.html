@@ -326,6 +326,12 @@ basilisk:{px:["........","g.....g.",".gggggg.","geegggg.",".gggggg.","..gggg..",
         pal:{".":null,"g":"#a8c83a","e":"#ff4a4a"}},
 bed   :{px:["........",".BBBBBB.",".BppllB.",".BppllB.",".BBBBBB.","........","........","........"],
         pal:{".":"#8a8296","B":"#6b3f1c","p":"#e8e8e8","l":"#a83232"}},
+dog   :{px:["........",".e......",".ee.....",".eeeeee.",".eeeeee.",".ee..et.",".e....e.","........"],
+        pal:{".":null,"e":"#8a5a2a","t":"#6b3f1c"}},
+cat   :{px:["........",".e.e....",".eee....",".eee..t.",".eeeeet.",".ee..e..","........","........"],
+        pal:{".":null,"e":"#9a9aa8","t":"#7a7a88"}},
+chicken:{px:["........","..c.....",".www....","wwwwb...",".www....","..ww....","..ll....","........"],
+        pal:{".":null,"c":"#e04040","w":"#f0f0e8","b":"#f0a030","l":"#e0b030"}},
 cave  :{px:["........","..aaaa..",".aaaaaa.","aaa00aaa","aa0000aa","aa0000aa","aaaaaaaa","........"],
         pal:{".":"#2e9a2e","a":"#8a8a8a","0":"#0a0a0a"}},
 dwall :{px:["bbbbbbbb","b...b...","bbbbbbbb","..b...b.","bbbbbbbb","b...b...","bbbbbbbb","..b...b."],
@@ -598,6 +604,13 @@ const ISLES=[];
 BARROW = landSpots(1,10,[CASTLE,...TOWNS,...SHRINES,...GATES,...DUNGEONS])[0]
          || {x:CASTLE.x+6,y:CASTLE.y+6};
 stampClear(BARROW.x,BARROW.y); sw(BARROW.x,BARROW.y,T.RUINS);
+// Vainglory, the town pride emptied — its ghosts keep no schedule and fear no siege
+{
+  const v=landSpots(1,11,[CASTLE,...TOWNS,...SHRINES,...GATES,...DUNGEONS,BARROW])[0]
+        || {x:CASTLE.x-8,y:CASTLE.y-8};
+  stampClear(v.x,v.y); sw(v.x,v.y,T.TOWN);
+  TOWNS.push({x:v.x,y:v.y,name:"Vainglory"});
+}
 // VARKUL's lair, in the far mountains — must border land walkable from the castle
 let LAIR=null;
 {
@@ -640,9 +653,32 @@ function padMap(rows){
   const w=Math.max(...rows.map(r=>r.length));
   return rows.map(r=>r.padEnd(w,"g"));
 }
+// buy the house a round and the house talks — deep lore, 5 gold a pour
+const RUMORS=[
+  "A drowned captain rides the ghost ship yet, and on his belt swings the finest SEXTANT ever ground.",
+  "The wardens of the pits fear no blade — but a rested arm and a full belly, that they fear.",
+  "When both moons go dark together, a gate sticks open and burns red. What walks out is nobody's friend.",
+  "The whirlpool spits ships out where SHE pleases. One barge landed a league inland, or so the mate swears.",
+  "Under the Silver Barrow sleeps a blade quenched in moonlight. The King below kept the key in his ribs.",
+  "VARKUL's hoard has a relic in it older than the dragon himself. Pray thou never findest out firsthand.",
+  "The shadow-cult strikes where virtue runs thinnest. Tend thy failings before they tend to thee.",
+  "Gilt and Wrack, the treasure isles — their bottom floors pay triple. Their bottom floors also EAT triple.",
+  "Eight shadows wait at the end of the road, they say — and every one of them wears thy face.",
+  "A hermit by a pond in Willowdale hears things in the water. Lately the water sounds worried.",
+  "The Rat King under Moonhaven grows back his crown every season. Marla pays fair rates for pest work.",
+  "They rebuilt every town but one. Vainglory got what pride pays for — go see what's left, if thy soul can bear it.",
+];
+function innDrinks(){
+  if(P.gold<5) return msg('"Five gold the round, friend. Come back heavier."',"m-sys");
+  P.gold-=5; sfx.gold(); renderStats();
+  msg("Thou standest the house a round. Mugs rise; tongues loosen.","m-gold");
+  msg(`"${RUMORS[Math.floor(R()*RUMORS.length)]}"`,"m-blue");
+}
 // every tavern keeps a bed: full heal, poison cured, sleep till dawn, meals included
 function innRest(cost){
   return ()=>{
+    if(P.thief && inLoc && P.thief.town===inLoc.key && turns<P.thief.until)
+      return msg('"No bed for thieves. Sleep in a ditch."',"m-bad");
     if(P.gold<cost) return msg('"No coin, no bed, friend."',"m-sys");
     P.gold-=cost; P.hp=P.maxhp; P.poison=false;
     turns=Math.ceil((turns+1)/400)*400;
@@ -657,6 +693,7 @@ function mkInn(name,greet,cost,gossip){
       room:{ask:`"A warm bed till first light — ${cost} gold. Take it?" (Y/N)`,
         yes:innRest(cost),
         no:()=>msg('"Suit thyself. The road is cold."',"m-say")},
+      drinks:innDrinks,
       gossip,
     }};
 }
@@ -896,7 +933,7 @@ town2:{
   "g,,,,,,~~~,,,,,,g",
   "g,,,,,,,,,,,,,,,g",
   "g#D####,#D##,,,,g",
-  "g#....#,#B.#,,,,g",
+  "g#.7..#,#B.#,,,,g",
   "g#..C.#,####,,,,g",
   "g######,,,,,,,,,g",
   "ggggggggggggggggg",
@@ -904,7 +941,8 @@ town2:{
   npcs:{
    "1":{name:"Mad Meg",spr:"merchant",peace:true,
      greet:"A wild-haired tavern keeper slams a mug on the counter.",
-     lines:{ job:"Rum and salt pork for them what pays! Say BUY.",
+     lines:{ job:"Rum and salt pork for them what pays! Say BUY. Or stand the house a round — say DRINKS.",
+       drinks:innDrinks,
        buy:{shop:"food"},
        room:{ask:'"A hammock and a lock on the door — 15 gold, harbor rates. Take it?" (Y/N)',
          yes:innRest(15),
@@ -932,6 +970,7 @@ town2:{
      greet:"A scrawny cabin boy polishes a boot that fits no one here.",
      lines:{ job:"I swab, I scrub, I listen.",
        secret:"The King snores. Also: the fence waters the rum AND the armor.",
+       jack:"Dicer Jack shaves his dice — everyone knows, nobody says. Call him CHEAT to his face and watch him sweat.",
        treasure:"Gilt and Wrack, the treasure isles! Deep caves, heavy chests. Take a strong hull.",
        capture:"Sink a pirate ship gentle-like and her crew gives up — then she's YOURS to sail." }},
    "5":{name:"Old Salt",spr:"guard",peace:true,
@@ -946,6 +985,24 @@ town2:{
        },
        whirl:"Hit the whirlpool once. Woke up half the sea away with me hat gone.",
        hull:"A moored ship mends herself slow. Or pay me and sail NOW." }},
+   "7":{name:"Dicer Jack",spr:"pirate",peace:true,always:1,hideTopics:["cheat"],
+     greet:"A gaunt pirate rattles a cup of dice. \"Feeling lucky, saint?\"",
+     lines:{
+       job:"Dice! Honest dice, honest odds. Say DICE — ten gold a throw.",
+       dice:{ask:'"Ten gold on the bones. Highest total takes the pot. Throw?" (Y/N)',
+         yes:()=>{ if(P.gold<10) return msg('"No stake, no throw."',"m-sys");
+           const mine=ri(1,6)+ri(1,6), his=ri(2,7)+ri(1,6);
+           msg(`Thou rollest ${mine}. Jack rolls ${his}.`,"m-say");
+           if(mine>his){ P.gold+=10; sfx.gold(); msg('"Bah! Take it," Jack spits. (+10 gold)',"m-gold"); }
+           else if(mine===his) msg('"Push. The house keeps nothing... this time."',"m-say");
+           else { P.gold-=10; msg('"The bones love me," Jack grins. (-10 gold)',"m-bad"); }
+           renderStats(); },
+         no:()=>msg('"Wise. Or poor. Same look, mostly."',"m-say")},
+       bones:"Been rolling these beauties since I had two hands' worth of fingers.",
+       cheat:()=>{ if(P.jackCaught) return msg('"ONCE I let that slide. Once."',"m-say");
+         P.jackCaught=true; P.gold+=20; sfx.gold(); renderStats();
+         virtue(3,4,'Jack blanches white. "Keep it quiet, aye?" He presses 20 gold on thee — justice, of a sort.'); },
+     }},
   }},
 willowdale:{
   name:"Willowdale",
@@ -1122,6 +1179,42 @@ stonevale:{
    "6":mkInn("Innkeeper Ash","An innkeeper with quarry dust in his beard sets out a candle.",10,
      "Miners sleep here when the deep spooks them. Lately? Full house, every night."),
   }},
+vainglory:{
+  name:"Vainglory",
+  map:padMap([
+  "ggggggggggggggggg",
+  "g,,##,,,,r,,##,,g",
+  "g,#1#,,,,,,,#,#,g",
+  "g,##,,r,,,,,,##,g",
+  "g,,,,,,,,r,,,,,,g",
+  "g@,,,r,,2,,,,,r,g",
+  "g,,,,,,,,,,,,,,,g",
+  "g,##,,,r,,,##,,,g",
+  "g,#,#,,,,,,#3#,,g",
+  "g,##,,r,,,,,##,,g",
+  "g,,,,,,,r,,,,,,,g",
+  "ggggggggggggggggg",
+  ]),
+  npcs:{
+   "1":{name:"Shade of the Lord Mayor",spr:"ghost",peace:true,always:1,
+     greet:"A cold shape in a chain of office wrings translucent hands.",
+     lines:{ job:"I governed the proudest town in Albion. Behold my works.",
+       pride:"We built higher than the castle. We named our sons after ourselves. The wind came anyway.",
+       fall:"No army razed us. No dragon burned us. We simply could not stop admiring the fire.",
+       mantra:"Humility. MEK. We learned the word too late to say it aloud." }},
+   "2":{name:"the Weeping Shade",spr:"ghost",peace:true,always:1,
+     greet:"A pale woman weeps without sound among the broken stones.",
+     lines:{ job:"I wept for Vainglory in life. Death has not changed my duties.",
+       test:{ask:'"Tell me true, traveler — art thou better than we were?" (Y/N)',
+         yes:()=>virtue(7,-5,'"So said we all," she whispers, and turns away.'),
+         no :()=>virtue(7,6,'"Then perhaps the land learns." Her tears glimmer like a blessing.')},
+       humility:"Its rune sleeps on a small far island. Humility keeps no mansions." }},
+   "3":{name:"Shade of a Builder",spr:"ghost",peace:true,always:1,
+     greet:"A broad ghost stacks stones that fall through his hands.",
+     lines:{ job:"I raised the towers. Fine towers. Thirsty ground.",
+       stone:"Stonevale quarried for us at double rate and asked no questions. Ask them who paid.",
+       warn:"Build thy soul before thy house, stranger. The reverse falls over." }},
+  }},
 cellar:{
   name:"Marla's Cellar",
   map:padMap([
@@ -1249,7 +1342,7 @@ void:{
   npcs:{}},
 };
 // map town index to LOC key (indexes 0-4 mainland, 5 = the pirate isle)
-const TOWN_KEYS=["town0","town1","willowdale","goldport","stonevale","town2"];
+const TOWN_KEYS=["town0","town1","willowdale","goldport","stonevale","town2","vainglory"];
 
 // —— NPC agendas ——————————————————————————————————————————————
 // Work at the marker spot; s = evening social spot; h = night bed.
@@ -1665,7 +1758,7 @@ function newGame(){
       lastAmbush:0, lastGhost:0, risen:false, risenDone:false,
       plot:null, plotDone:false, trialDone:false, trialHinted:false, trialNagged:false,
       runes:[false,false,false,false,false,false,false,false], bow:false, horse:false, horseStep:false,
-      relics:{}, relicsFound:{}, lastTitle:"the Stranger", dunBossSlain:{} };
+      relics:{}, relicsFound:{}, lastTitle:"the Stranger", dunBossSlain:{}, thief:null, jackCaught:false };
   ghostShip=null;
   SEEN=new Uint8Array(W*H);
   // ensure start tile walkable
@@ -2114,6 +2207,25 @@ function enterLoc(){
         npcs.push(Object.assign({x,y,wx:x,wy:y},def));
       grid[y][x]=(grid[y][x-1]===","||grid[y][x+1]===",")?",":"."; }
     else if(ch==="@"){ entry={x,y}; grid[y][x]=","; }
+  }
+  // living towns keep living things underfoot
+  if(TOWN_KEYS.includes(key) && key!=="vainglory"){
+    const CRITTERS = key==="town2" ? [["a mangy rat","rat"],["a scarred cat","cat"]]
+      : [["a dog","dog"],["a cat","cat"],["a chicken","chicken"]];
+    let placed=0, tries=0;
+    while(placed<CRITTERS.length && tries++<200){
+      const x=1+Math.floor(R()*(grid[0].length-2)), y=1+Math.floor(R()*(grid.length-2));
+      if(grid[y][x]!==",") continue;
+      if(npcs.some(n=>n.x===x&&n.y===y)) continue;
+      const[nm,spr]=CRITTERS[placed];
+      npcs.push({x,y,wx:x,wy:y,name:nm,spr,peace:true,wander:1,always:1,
+        greet: spr==="dog"?"Woof! The dog wags hopefully."
+             : spr==="cat"?"Mrow. The cat permits thy presence."
+             : spr==="chicken"?"Bwok. The chicken regards thee without respect."
+             : "Squeak. The rat has seen things.",
+        lines:{}});
+      placed++;
+    }
   }
   inLoc={key, map:grid.map(r=>r.join("")), npcs, w:grid[0].length, h:grid.length,
          ret:{x:P.x,y:P.y}};
@@ -2843,6 +2955,13 @@ function tick(){
   // townsfolk go about their day — a true path (BFS) toward wherever the hour calls them
   if(inLoc && !inLoc.raid && turns%2===0){
     for(const n of inLoc.npcs){
+      if(n.wander){   // critters amble wherever their noses lead
+        if(R()<.5) continue;
+        const[dx,dy]=[[1,0],[-1,0],[0,1],[0,-1]][Math.floor(R()*4)];
+        const nx=n.x+dx, ny=n.y+dy, ch=inLoc.map[ny]&&inLoc.map[ny][nx];
+        if(ch===","&&!npcAt(nx,ny)&&!(nx===P.x&&ny===P.y)&&!monsterAt(nx,ny)){ n.x=nx; n.y=ny; }
+        continue;
+      }
       const sp=phaseSpot(n);
       if(n.x===sp.x && n.y===sp.y) continue;
       const st=npcStep(n,sp);
@@ -2977,7 +3096,9 @@ function tick(){
 //---------------------------------------------------------------
 // 15. Commands
 //---------------------------------------------------------------
-function topicKeys(n){ return Object.keys(n.lines).slice(0,6); }  // deeper topics stay secrets
+function topicKeys(n){
+  return Object.keys(n.lines).filter(k=>!(n.hideTopics||[]).includes(k)).slice(0,6);
+}  // deeper topics (and hidden ones) stay secrets
 function topicChips(n){
   return topicKeys(n).map(k=>({label:k.toUpperCase(), value:k}))
     .concat([{label:"BYE", value:"bye"}]);
@@ -2985,6 +3106,7 @@ function topicChips(n){
 function cmdTalk(dx,dy){
   const n=npcAt(P.x+dx,P.y+dy);
   if(!n){ msg("Funny — no response.","m-sys"); return; }
+  if(n.wander){ msg(n.greet,"m-say"); return; }   // beasts keep no topics
   if(dayPhase()==="sleep" && !n.always){ msg(`${n.name} is fast asleep. Zzz...`,"m-sys"); return; }
   msg(n.greet,"m-blue");
   const t=playerTitle();
@@ -3010,6 +3132,8 @@ function talkLoop(n){
           if(typeof v==="string") msg(`"${v}"`,"m-say");
           else if(typeof v==="function") v();
           else if(v.shop){
+            if(P.thief && inLoc && P.thief.town===inLoc.key && turns<P.thief.until){
+              msg(`"Out! We remember thy thieving face!"`,"m-bad"); handled=true; break; }
             if(dayPhase()!=="work" && !n.always){ msg(`"The shop is shut till morning, friend."`,"m-say"); handled=true; break; }
             openShop(v.shop,n); return;
           }
@@ -3153,6 +3277,24 @@ function cmdGet(){
       msg(`(${P.runes.filter(Boolean).length}/8 runes. Its shrine will answer thee now.)`,"m-sys");
       sfx.virtue(); renderStats(); tick(); return;
     }
+    // an unwatched counter is a test of Honesty
+    if(inLoc && !inLoc.raid && TOWN_KEYS.includes(inLoc.key)
+       && [[0,1],[0,-1],[1,0],[-1,0]].some(([dx,dy])=>(inLoc.map[P.y+dy]||"")[P.x+dx]==="C")){
+      askYesNo("Goods lie on the counter, and no eye is certain. Steal them? (Y/N)",
+        ()=>{
+          const loot=ri(5,20); P.gold+=loot;
+          virtue(0,-8,"Thou stuffest thy pockets like a common cutpurse.");
+          if(R()<.5){
+            P.thief={town:inLoc.key, until:turns+500};
+            virtue(3,-4);
+            msg('"THIEF! THIEF!" The cry goes up — every honest door in town slams against thee!',"m-bad");
+            sfx.die();
+          } else msg(`Thou palmest ${loot} gold, unseen. Thy hands are quick; thy soul, poorer.`,"m-sys");
+          renderStats();
+        },
+        ()=>msg("Thou stayest thy hand. The counter keeps its coin.","m-sys"));
+      return;
+    }
     msg("Nothing here to take.","m-sys"); return;
   }
   chests=chests.filter(x=>x!==c);
@@ -3239,6 +3381,7 @@ function cmdCamp(){
   if(inLoc){
     if(inLoc.raid) return msg("No rest while foes prowl the streets!","m-bad");
     if(!TOWN_KEYS.includes(inLoc.key)) return msg("No inn keeps beds here.","m-sys");
+    if(inLoc.key==="vainglory") return msg("No living hand keeps beds in Vainglory.","m-sys");
     msg("Seek the innkeeper at the tavern — they will see thee bedded till dawn.","m-sys");
     return;
   }
@@ -3316,6 +3459,9 @@ function load(){
       ? Object.fromEntries(Object.keys(RELICS).filter(k=>o[k]).map(k=>[k,true])) : {};
     P.relics=cleanRelics(P.relics); P.relicsFound=cleanRelics(P.relicsFound);
     if(typeof P.lastTitle!=="string" || P.lastTitle.length>40) P.lastTitle="the Stranger";
+    P.jackCaught=!!P.jackCaught;
+    P.thief=(P.thief&&typeof P.thief==="object"&&TOWN_KEYS.includes(P.thief.town))
+      ? {town:P.thief.town, until:sNum(P.thief.until,0,0,1e9)} : null;
     { const src=(P.dunBossSlain&&typeof P.dunBossSlain==="object")?P.dunBossSlain:{};
       P.dunBossSlain={};
       for(let i=0;i<6;i++) if(src[i]===true) P.dunBossSlain[i]=true; }
