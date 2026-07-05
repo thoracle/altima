@@ -1484,18 +1484,40 @@ function genDunLevel(di,lvl){
     let bx=0,by=0; const minions=[], vChests=[];
     for(let vy=0;vy<VAULT.length;vy++)for(let vx=0;vx<VAULT[0].length;vx++){
       const ch=VAULT[vy][vx], X=ox+vx, Y=oy+vy;
+      if(g[Y*DW+X]===T.LADDU) continue;   // never wall over the way out
       g[Y*DW+X] = ch==="w"? T.DWALL : ch==="L"? T.LADDD : T.DFLOOR;
       if(ch==="B"){ bx=X; by=Y; }
       else if(ch==="m") minions.push({x:X,y:Y});
       else if(ch==="$") vChests.push({x:X,y:Y});
       else if(ch==="L"){ down.x=X; down.y=Y; }
     }
-    // carve a way in: door at the top wall, then an L-tunnel to the up ladder
+    // carve a way in: door at the top wall, tunnel OUTWARD until open floor
     let cx3=ox+5, cy3=oy;
     g[cy3*DW+cx3]=T.DFLOOR;
-    let x3=cx3, y3=Math.max(1,cy3-1);
-    while(y3!==up.y){ if(g[y3*DW+x3]===T.DWALL) g[y3*DW+x3]=T.DFLOOR; y3+=Math.sign(up.y-y3); }
-    while(x3!==up.x){ if(g[y3*DW+x3]===T.DWALL) g[y3*DW+x3]=T.DFLOOR; x3+=Math.sign(up.x-x3); }
+    let x3=cx3, y3=cy3-1;
+    while(y3>=1 && g[y3*DW+x3]===T.DWALL){ g[y3*DW+x3]=T.DFLOOR; y3--; }
+    // the vault walls may have severed the level's corridors — prove up→down, else carve direct
+    const walkable=t=> t===T.DFLOOR||t===T.LADDU||t===T.LADDD;
+    const reach=()=>{
+      const seen=new Uint8Array(DW*DH); seen[up.y*DW+up.x]=1;
+      const q=[up.y*DW+up.x]; let qi=0;
+      while(qi<q.length){
+        const i=q[qi++], x=i%DW, y=(i/DW)|0;
+        if(x===down.x&&y===down.y) return true;
+        for(const[dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){
+          const nx=x+dx,ny=y+dy;
+          if(nx<0||ny<0||nx>=DW||ny>=DH) continue;
+          const j=ny*DW+nx;
+          if(!seen[j] && walkable(g[j])){ seen[j]=1; q.push(j); }
+        }
+      }
+      return false;
+    };
+    if(!reach()){
+      x3=cx3; y3=Math.max(1,cy3-1);
+      while(y3!==up.y){ if(g[y3*DW+x3]===T.DWALL) g[y3*DW+x3]=T.DFLOOR; y3+=Math.sign(up.y-y3); }
+      while(x3!==up.x){ if(g[y3*DW+x3]===T.DWALL) g[y3*DW+x3]=T.DFLOOR; x3+=Math.sign(up.x-x3); }
+    }
     // the vault belongs to the warden, not to wandering vermin
     for(let k=mobs.length-1;k>=0;k--)
       if(mobs[k].x>=ox&&mobs[k].x<ox+11&&mobs[k].y>=oy&&mobs[k].y<oy+9) mobs.splice(k,1);
@@ -2402,13 +2424,16 @@ function killMonster(m){
   if(m.capture){
     msg("The pirates strike their colors — the ship is thine!","m-gold");
     if(g>0){ P.gold+=g; msg(`Thou findest ${g} gold in her hold.`,"m-gold"); }
-    const sx=m.x, sy=m.y;
-    askYesNo("Claim her as thy prize? (No strips her for salvage)",
-      ()=>{ ships.push({x:sx,y:sy,hull:30,maxhull:50});
-            msg("Thy prize rides at anchor where she struck. (B crosses decks when alongside.)","m-blue"); },
-      ()=>{ const s=45+ri(0,25); P.gold+=s; sfx.gold();
-            msg(`Thou strippest her fittings for ${s} gold; the bare hull slips under.`,"m-gold");
-            renderStats(); });
+    // claim first, ask second: an escaped or mumbled answer must never sink the prize
+    const prize={x:m.x,y:m.y,hull:30,maxhull:50};
+    ships.push(prize);
+    askYesNo("Strip her for salvage? (No keeps her as thy prize)",
+      ()=>{ const idx=ships.indexOf(prize);
+            if(idx>=0){ ships.splice(idx,1);
+              const s=45+ri(0,25); P.gold+=s; sfx.gold();
+              msg(`Thou strippest her fittings for ${s} gold; the bare hull slips under.`,"m-gold");
+              renderStats(); } },
+      ()=>{ msg("Thy prize rides at anchor where she struck. (B crosses decks when alongside.)","m-blue"); });
   }
   else if(g>0 && m.water){ P.gold+=g; msg(`Thou fishest ${g} gold from the wreckage.`,"m-gold"); }
   else if(g>0) chests.push({x:m.x,y:m.y,gold:g});
