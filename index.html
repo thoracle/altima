@@ -80,6 +80,7 @@
       <div><kbd>M</kbd> meditate at shrine</div>
       <div><kbd>B</kbd> board / cross ships &nbsp;<kbd>X</kbd> go ashore</div>
       <div><kbd>H</kbd> hole up & camp</div>
+      <div><kbd>P</kbd> peer at world map</div>
       <div><kbd>Z</kbd> ztats &nbsp;<kbd>?</kbd> help</div>
       <div><kbd>Shift+S</kbd> save &nbsp;<kbd>Space</kbd> pass</div>
     </div>
@@ -459,6 +460,39 @@ function genWorld(){
 }
 const gw=(x,y)=> (x<0||y<0||x>=W||y>=H)?T.DEEP:world[y*W+x];
 const sw=(x,y,t)=>{world[y*W+x]=t;};
+
+// fog of war: the world map shows only what thou hast seen with thine own eyes
+let SEEN=new Uint8Array(W*H);
+function revealAround(cx0,cy0){
+  const r=(isNight()?4:6)+(P&&P.relics&&P.relics.sextant?2:0);
+  for(let dy=-r;dy<=r;dy++)for(let dx=-r;dx<=r;dx++){
+    const x=cx0+dx, y=cy0+dy;
+    if(x>=0&&y>=0&&x<W&&y<H && dx*dx+dy*dy<=r*r+2) SEEN[y*W+x]=1;
+  }
+}
+function packSeen(){
+  const b=new Uint8Array(W*H/8);
+  for(let i=0;i<W*H;i++) if(SEEN[i]) b[i>>3]|=1<<(i&7);
+  let s="";
+  for(let i=0;i<b.length;i+=64) s+=String.fromCharCode.apply(null,b.subarray(i,i+64));
+  return btoa(s);
+}
+function unpackSeen(str){
+  SEEN=new Uint8Array(W*H);
+  try{
+    const s=atob(str||"");
+    for(let i=0;i<s.length && i*8<W*H;i++){
+      const v=s.charCodeAt(i);
+      for(let k=0;k<8;k++) if(v&(1<<k)) SEEN[i*8+k]=1;
+    }
+  }catch(e){}
+}
+const MAPCOL={
+  [T.DEEP]:"#0b2a6e",[T.WATER]:"#1e4fae",[T.SAND]:"#d6c06a",[T.GRASS]:"#2e9a2e",
+  [T.FOREST]:"#0f5e14",[T.HILLS]:"#7a8a3a",[T.MOUNT]:"#8a8a8a",[T.SWAMP]:"#33502a",
+  [T.TOWN]:"#ffd24a",[T.CASTLE]:"#ffffff",[T.SHRINE]:"#e8e2cc",[T.RUINS]:"#c8c8c8",
+  [T.DENT]:"#ff8a4a",[T.LAIR]:"#ff5a1e",
+};
 
 // find land spots for locations (deterministic)
 function landSpots(count,minDist,avoid){
@@ -1411,6 +1445,7 @@ function newGame(){
       runes:[false,false,false,false,false,false,false,false], bow:false, horse:false, horseStep:false,
       relics:{}, relicsFound:{} };
   ghostShip=null;
+  SEEN=new Uint8Array(W*H);
   // ensure start tile walkable
   if(!WALK_LAND.has(gw(P.x,P.y))){ sw(P.x,P.y,T.GRASS); }
   monsters=[]; chests=[]; inLoc=null; inDun=null; wMobs=wChests=null; turns=0;
@@ -1519,7 +1554,27 @@ function argent(){ return Math.floor(turns/24)%GATES.length; }
 function umbra(){ return Math.floor(turns/8)%GATES.length; }
 function moonPhase(){ return argent(); }
 
+function drawMap(){
+  cx.fillStyle="#000"; cx.fillRect(0,0,cv.width,cv.height);
+  const s=4, ox=(cv.width-W*s)/2, oy=(cv.height-H*s)/2;
+  for(let y=0;y<H;y++)for(let x=0;x<W;x++){
+    if(!SEEN[y*W+x]) continue;
+    cx.fillStyle=MAPCOL[world[y*W+x]]||"#333";
+    cx.fillRect(ox+x*s,oy+y*s,s,s);
+  }
+  for(const g of GATES)
+    if(SEEN[g.y*W+g.x]){ cx.fillStyle="#5fd9ff"; cx.fillRect(ox+g.x*s,oy+g.y*s,s,s); }
+  if(animF){ cx.fillStyle="#ffffff"; cx.fillRect(ox+P.x*s-2,oy+P.y*s-2,s+4,s+4); }
+  let n=0; for(let i=0;i<SEEN.length;i++) n+=SEEN[i];
+  cx.fillStyle="#ffd24a"; cx.font="13px monospace"; cx.textAlign="center";
+  cx.fillText("— THE KNOWN WORLD —",cv.width/2,12);
+  cx.fillStyle="#b0b6c8";
+  cx.fillText(Math.round(100*n/(W*H))+"% charted · any key returns",cv.width/2,cv.height-4);
+  cx.textAlign="start";
+}
 function render(){
+  if(mode==="map"){ drawMap(); return; }
+  if(P && !inLoc && !inDun && mode!=="title") revealAround(P.x,P.y);
   cx.fillStyle="#000"; cx.fillRect(0,0,cv.width,cv.height);
   const px=P.x, py=P.y;
   for(let vy=0;vy<VIEW;vy++)for(let vx=0;vx<VIEW;vx++){
@@ -2895,7 +2950,7 @@ function save(){
   try{
     const parked = inDun || (inLoc&&inLoc.raid);
     localStorage.setItem(SAVE_KEY,JSON.stringify({
-      P, turns, ships, whirl, ghostShip,
+      P, turns, ships, whirl, ghostShip, seen: packSeen(),
       monsters: parked? wMobs : monsters,
       chests:   parked? wChests : chests,
       inLocRet: inLoc? inLoc.ret : null,
@@ -2941,6 +2996,7 @@ function load(){
       .filter(s=>sPos(s)).map(s=>({x:sNum(s.x,0,0,W-1),y:sNum(s.y,0,0,H-1),
         hull:sNum(s.hull,50,1,999),maxhull:sNum(s.maxhull,50,1,999),ghost:!!s.ghost})).slice(0,16);
     whirl=sPos(d.whirl); ghostShip=sPos(d.ghostShip);
+    unpackSeen(typeof d.seen==="string"? d.seen : "");
     turns=sNum(d.turns,0,0,1e9);
     P.onShip=!!P.onShip;
     P.shipIdx=sNum(P.shipIdx,-1,-1,ships.length-1);
@@ -2974,6 +3030,7 @@ document.addEventListener("keydown",e=>{
   if(mode==="dead"){ respawn(); return; }
   if(mode==="won"){ mode="play"; hideOverlay(); render(); return; }
   if(mode==="help"){ mode="play"; hideOverlay(); render(); return; }
+  if(mode==="map"){ mode="play"; render(); return; }
 
   if(mode==="dir"){
     const d=KEYDIR[e.key];
@@ -3015,13 +3072,17 @@ document.addEventListener("keydown",e=>{
     case "h": cmdCamp(); break;
     case "z": cmdZtats(); break;
     case "v": toggleMusic(); break;
+    case "p":
+      if(inLoc||inDun) msg("Thou canst not survey the world from indoors.","m-sys");
+      else { mode="map"; drawMap(); }
+      break;
     case "?": case "/":
       mode="help";
       showOverlay("COMMANDS",
         `Arrows / WASD — move & bump-attack<br>
          T — talk (then direction) · F — attack, or cannons at sea<br>
          E — enter town/castle/dungeon, climb ladders<br>
-         M — meditate at shrine · G — get chest<br>
+         M — meditate at shrine · G — get chest · P — peer at map<br>
          B — board or cross to adjacent ship · X — go ashore · H — camp<br>
          Z — ztats · Shift+S — save · Space — pass<br><br>
          Raise all eight virtues to 80 to become the Saint.<br>

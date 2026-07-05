@@ -61,6 +61,7 @@ thy progress.
 | G | open a chest |
 | B / X | board or cross ships / go ashore |
 | H | camp |
+| P | peer at the world map (fog of war) |
 | Z | stats & proven mantras |
 | V | toggle music |
 | Shift+S | save |
