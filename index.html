@@ -706,6 +706,7 @@ castle:{
         else msg(`"${VIRTUES[best]} burns brightest in thee. But ${VIRTUES[worst]} sleeps — tend it, lest it wake thee at night."`,"m-blue");
       },
       rune:"Each shrine sleeps until its rune wakes it. The runes lie hidden where their virtues LIVE — ask those who embody them.",
+      title:()=>msg(`"The folk have a name for thee: ${playerTitle()}. Names change as souls do. Stranger, Seeker, Pilgrim, Adept, Paragon... and beyond the Trial, sainthood."`,"m-blue"),
       saint:()=>msg(P.avatar? '"Thou art the Saint. Even the blind see that."'
         : P.trialDone? '"The Trial is behind thee. Only fullness of virtue remains."'
         : '"The path is deeds, shrines, and at the last, thy own shadows."',"m-blue"),
@@ -1443,7 +1444,7 @@ function newGame(){
       lastAmbush:0, lastGhost:0, risen:false, risenDone:false,
       plot:null, plotDone:false, trialDone:false, trialHinted:false, trialNagged:false,
       runes:[false,false,false,false,false,false,false,false], bow:false, horse:false, horseStep:false,
-      relics:{}, relicsFound:{} };
+      relics:{}, relicsFound:{}, lastTitle:"the Stranger" };
   ghostShip=null;
   SEEN=new Uint8Array(W*H);
   // ensure start tile walkable
@@ -1503,7 +1504,14 @@ function virtue(i,amt,text){
   if(text) msg(text, amt>0?"m-good":"m-bad");
   if(amt>0 && v[i]>before){ msg(`Thou dost feel more ${VIRTUES[i].toLowerCase()}.`,"m-blue"); sfx.virtue(); }
   else if(amt<0 && v[i]<before){ msg(`Thou hast strayed from ${VIRTUES[i]}.`,"m-bad"); }
-  checkAvatar(); renderStats();
+  checkAvatar();
+  const t=playerTitle();
+  if(P.lastTitle!==t){
+    if(P.lastTitle) msg(`Word spreads through Albion: folk now call thee ${t}!`,"m-gold");
+    P.lastTitle=t;
+    if(P.lastTitle!=="the Stranger") sfx.level();
+  }
+  renderStats();
 }
 function checkAvatar(){
   if(P.avatar) return;
@@ -1636,7 +1644,7 @@ function renderStats(){
   if(!P) return;
   const w=WEAPONS[P.weapon], a=ARMORS[P.armor];
   const MOONG=["🌑","🌒","🌓","🌔","🌕","🌖","🌗","🌘"];
-  let html=`<h3>THE STRANGER${P.avatar?" ✦SAINT✦":""}</h3>`;
+  let html=`<h3>${P.avatar?"✦ ":""}${esc(playerTitle().toUpperCase())}${P.avatar?" ✦":""}</h3>`;
   if(P.finalSiege && !P.finalDone) html+=`<div class="srow"><b style="color:var(--red)">⚔ CASTLE LUMEN BESIEGED!</b></div>`;
   else if(P.siege) html+=`<div class="srow"><b style="color:var(--red)">${P.siege.fire?"🔥":"⚔"} ${LOCS[TOWN_KEYS[P.siege.town]].name} ${P.siege.fire?"burns":"besieged"}!</b></div>`;
   if(P.moonCurse) html+=`<div class="srow"><b style="color:var(--red)">☠ A moongate festers!</b></div>`;
@@ -1792,6 +1800,18 @@ function enterGate(){
 }
 
 function virtueAvg(){ return P.virtues.reduce((a,b)=>a+b,0)/8; }
+function playerTitle(){
+  if(P.avatar) return "the Saint";
+  if(P.trialDone) return "the Trial-Proven";
+  if(P.virtues.every(v=>v>=65)) return "the Paragon";
+  const mi=P.virtues.indexOf(100);
+  if(mi>=0) return "Master of "+VIRTUES[mi];
+  const avg=virtueAvg();
+  if(avg>=55) return "the Adept";
+  if(avg>=40) return "the Pilgrim";
+  if(P.virtues.some(v=>v>=40)) return "the Seeker";
+  return "the Stranger";
+}
 function skullhavenHostile(){
   if(P.finalDone) return false;   // leaderless, the pirates keep the peace
   return P.skullWrath || (virtueAvg()>=65 && !P.skullRespect);
@@ -2983,6 +3003,7 @@ function load(){
     const cleanRelics=o=>(o&&typeof o==="object")
       ? Object.fromEntries(Object.keys(RELICS).filter(k=>o[k]).map(k=>[k,true])) : {};
     P.relics=cleanRelics(P.relics); P.relicsFound=cleanRelics(P.relicsFound);
+    if(typeof P.lastTitle!=="string" || P.lastTitle.length>40) P.lastTitle="the Stranger";
     if(P.siege && !(Number.isInteger(P.siege.town)&&P.siege.town>=0&&P.siege.town<=4)) P.siege=null;
     if(P.moonCurse && !(Number.isInteger(P.moonCurse.gate)&&GATES[P.moonCurse.gate])) P.moonCurse=null;
     if(P.desec && !(Number.isInteger(P.desec.v)&&P.desec.v>=0&&P.desec.v<8)) P.desec=null;
