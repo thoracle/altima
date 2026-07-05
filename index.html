@@ -62,10 +62,45 @@
     background:var(--panel); color:var(--fg); border:1px solid var(--border);
     font:inherit; font-size:15px; padding:2px 8px; cursor:pointer; border-radius:3px;}
   #sndbtn:hover{border-color:var(--accent);}
+  /* —— mobile chrome (body.mobile) —— */
+  #mhud,#mbar,#joy{display:none;}
+  body.mobile{align-items:flex-start;}
+  body.mobile #frame{display:flex; flex-direction:column; gap:4px; padding:0; width:100vw; max-width:480px; margin:0 auto;}
+  body.mobile #screen{order:2; width:100%; aspect-ratio:1/1; height:auto; margin:0 auto; border-left:none; border-right:none;}
+  body.mobile #joy{left:max(14px, calc(50vw - 240px + 14px));}
+  body.mobile #sndbtn{top:calc(env(safe-area-inset-top,0px) + 44px); right:8px;}
+  body.mobile #mhud{display:flex; order:1; justify-content:space-between; align-items:center;
+    padding:calc(env(safe-area-inset-top,0px) + 6px) 12px 6px; font-size:14px; width:100%;
+    background:var(--panel); border-bottom:1px solid var(--border);}
+  body.mobile #mhud .hpbar{width:90px; height:10px; background:#1a1a2a; border:1px solid #2a2a44; display:inline-block; vertical-align:middle;}
+  body.mobile #mhud .hpfill{height:100%; background:var(--green);}
+  body.mobile #mhud .hpfill.low{background:var(--red);}
+  body.mobile #mhud .mtitle{color:var(--accent); font-size:11px; letter-spacing:1px;}
+  body.mobile #logbox{order:3; width:100%; max-width:none; height:132px; font-size:15px; border-left:none; border-right:none;}
+  body.mobile #stats{position:fixed; top:0; right:-280px; width:264px; height:100%; z-index:30;
+    transition:right .2s; overflow-y:auto; padding-top:calc(env(safe-area-inset-top,0px) + 10px);}
+  body.mobile #stats.open{right:0; box-shadow:-8px 0 24px #000c;}
+  body.mobile #mbar{display:flex; order:4; gap:8px; width:100%; padding:8px 10px calc(env(safe-area-inset-bottom,0px) + 10px);}
+  body.mobile #mbar button{font:inherit; font-size:15px; background:#10101e; color:var(--fg);
+    border:1px solid var(--border); border-radius:8px; padding:12px 10px;}
+  body.mobile #mbar #mact{flex:1; color:var(--accent); border-color:var(--accent); font-weight:bold;}
+  body.mobile #joy{display:block; position:fixed; left:14px; bottom:calc(env(safe-area-inset-bottom,0px) + 92px);
+    width:124px; height:124px; border-radius:50%; background:#ffffff10; border:2px solid #ffffff22;
+    z-index:20; touch-action:none;}
+  body.mobile #joyknob{position:absolute; left:38px; top:38px; width:48px; height:48px; border-radius:50%;
+    background:#ffffff2e; border:2px solid #ffffff55; pointer-events:none;}
+  body.mobile #screen{touch-action:none;}
 </style>
 </head>
 <body>
 <div id="frame">
+  <div id="mhud"></div>
+  <div id="mbar">
+    <button id="mmap">🗺</button>
+    <button id="mact">…</button>
+    <button id="mwait">💤</button>
+  </div>
+  <div id="joy"><div id="joyknob"></div></div>
   <button id="sndbtn" title="music on/off (V)">🎵</button>
   <canvas id="screen" width="416" height="416"></canvas>
   <div id="stats"></div>
@@ -2150,6 +2185,7 @@ function renderStats(){
       <div class="vbar"><div class="vfill${val>=80?" max":""}" style="width:${val}%"></div></div></div>`;
   });
   statsEl.innerHTML=html;
+  if(typeof updateMobileUI==="function") updateMobileUI();
 }
 
 //---------------------------------------------------------------
@@ -3823,6 +3859,103 @@ $("sndbtn").addEventListener("click",e=>{
   toggleMusic();
   e.currentTarget.blur();   // don't steal Space/Enter from the game
 });
+//---------------------------------------------------------------
+// Mobile chrome: joystick + one smart button (body.mobile only)
+//---------------------------------------------------------------
+const IS_MOBILE = matchMedia("(pointer:coarse)").matches || innerWidth<720
+               || /[?&]mobile=1/.test(location.search);   // dev preview override
+function pressKey(k){ document.dispatchEvent(new KeyboardEvent("keydown",{key:k})); }
+function contextAction(){
+  if(!P || mode==="title") return ["…",null];
+  if(mode==="dead"||mode==="won"||mode==="help"||mode==="map") return ["Continue"," "];
+  if(mode==="text") return ["…",null];
+  if(chests.some(c=>c.x===P.x&&c.y===P.y)) return ["Open chest","g"];
+  if(inDun){
+    const t=tileAt(P.x,P.y);
+    if(t===T.LADDU) return ["Climb up","e"];
+    if(t===T.LADDD) return ["Climb down","e"];
+    return ["Wait"," "];
+  }
+  if(inLoc){
+    try{ if(runeHere()>=0) return ["Search here","g"]; }catch(e){}
+    const nbs=[[1,0],[-1,0],[0,1],[0,-1]].map(([dx,dy])=>npcAt(P.x+dx,P.y+dy)).filter(Boolean);
+    if(nbs.length===1 && !nbs[0].wander) return ["Talk: "+nbs[0].name.split(" ")[0],"t"];
+    if(nbs.length>1) return ["Talk…","t"];
+    if([[0,1],[0,-1],[1,0],[-1,0]].some(([dx,dy])=>(inLoc.map[P.y+dy]||"")[P.x+dx]==="C"))
+      return ["Search counter","g"];
+    return ["Wait"," "];
+  }
+  const t=gw(P.x,P.y);
+  if(t===T.TOWN){ const i=TOWNS.findIndex(tt=>tt.x===P.x&&tt.y===P.y);
+    return ["Enter "+(i>=0&&LOCS[TOWN_KEYS[i]]?LOCS[TOWN_KEYS[i]].name:"town"),"e"]; }
+  if(t===T.CASTLE) return ["Enter the castle","e"];
+  if(t===T.DENT){ const i=DUNGEONS.findIndex(d=>d.x===P.x&&d.y===P.y);
+    return ["Descend "+(i>=0?DUNGEONS[i].name:"the pit"),"e"]; }
+  if(t===T.SHRINE) return ["Meditate","m"];
+  if(t===T.RUINS) return ["Enter the barrow","e"];
+  if(t===T.LAIR) return ["Enter the lair","e"];
+  if(P.onShip){
+    if([[0,1],[0,-1],[1,0],[-1,0]].some(([dx,dy])=>WALK_LAND.has(gw(P.x+dx,P.y+dy))))
+      return ["Go ashore","x"];
+    if(ships.some((s,i)=>i!==P.shipIdx&&Math.abs(s.x-P.x)+Math.abs(s.y-P.y)===1))
+      return ["Cross decks","b"];
+    return ["Wait"," "];
+  }
+  if(ships.some(s=>Math.abs(s.x-P.x)+Math.abs(s.y-P.y)===1)
+     || (ghostShip&&Math.abs(ghostShip.x-P.x)+Math.abs(ghostShip.y-P.y)===1)) return ["Board ship","b"];
+  return ["Camp","h"];
+}
+function updateMobileUI(){
+  if(!document.body.classList.contains("mobile")) return;
+  const [label]=contextAction();
+  $("mact").textContent=label;
+  if(P){
+    const pct=Math.max(0,Math.min(100,Math.round(100*P.hp/P.maxhp)));
+    $("mhud").innerHTML=
+      `<span><span class="hpbar"><span class="hpfill${pct<30?" low":""}" style="width:${pct}%"></span></span> ${P.hp}</span>`+
+      `<span class="mtitle">${esc(playerTitle().toUpperCase())}</span>`+
+      `<span>⛁${P.gold} 🍞${P.food}${P.poison?" ☠":""}</span>`;
+  }
+}
+if(IS_MOBILE){
+  document.body.classList.add("mobile");
+  // smart button + bar
+  $("mact").addEventListener("click",()=>{ const[,k]=contextAction(); if(k) pressKey(k); });
+  $("mmap").addEventListener("click",()=>pressKey("p"));
+  $("mwait").addEventListener("click",()=>pressKey(" "));
+  $("mhud").addEventListener("click",()=>$("stats").classList.toggle("open"));
+  $("screen").addEventListener("click",()=>$("stats").classList.remove("open"));
+  // joystick: hold to walk, dominant axis, arrow-key cadence
+  const joy=$("joy"), knob=$("joyknob");
+  let joyDir=null, joyTimer=null;
+  const KEYS={up:"ArrowUp",down:"ArrowDown",left:"ArrowLeft",right:"ArrowRight"};
+  const setKnob=(dx,dy)=>{ knob.style.left=(38+dx)+"px"; knob.style.top=(38+dy)+"px"; };
+  const engage=(dir)=>{
+    if(dir===joyDir) return;
+    joyDir=dir;
+    clearInterval(joyTimer); joyTimer=null;
+    if(dir){ pressKey(KEYS[dir]); joyTimer=setInterval(()=>{ if(joyDir) pressKey(KEYS[joyDir]); },170); }
+  };
+  const track=(t)=>{
+    const r=joy.getBoundingClientRect();
+    const dx=t.clientX-(r.left+r.width/2), dy=t.clientY-(r.top+r.height/2);
+    const len=Math.hypot(dx,dy);
+    if(len<16){ engage(null); setKnob(0,0); return; }
+    const cl=Math.min(len,44), kx=dx/len*cl, ky=dy/len*cl;
+    setKnob(kx,ky);
+    engage(Math.abs(dx)>Math.abs(dy) ? (dx>0?"right":"left") : (dy>0?"down":"up"));
+  };
+  joy.addEventListener("touchstart",e=>{ e.preventDefault(); ensureMusic(); track(e.touches[0]); },{passive:false});
+  joy.addEventListener("touchmove", e=>{ e.preventDefault(); track(e.touches[0]); },{passive:false});
+  const release=e=>{ e.preventDefault(); engage(null); setKnob(0,0); };
+  joy.addEventListener("touchend",release,{passive:false});
+  joy.addEventListener("touchcancel",release,{passive:false});
+  // audio + autosave lifecycle
+  document.addEventListener("touchstart",()=>ensureMusic(),{once:true});
+  document.addEventListener("visibilitychange",()=>{
+    if(document.hidden && P && mode!=="title" && mode!=="dead"){ try{ save(); }catch(e){} }
+  });
+}
 setInterval(()=>{ animF^=1; if(mode!=="title") render(); },500);
 msg("ALTIMA","m-gold");
 msg("Press any key to begin.","m-sys");

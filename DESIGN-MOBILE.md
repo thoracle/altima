@@ -52,17 +52,19 @@ required. Desktop keys keep working (one codebase, responsive).
 - Landscape: two-column (canvas left, log+stats right) via media query —
   approximately the desktop layout.
 
-## Movement: tap-to-move (+ swipe step)
+## Movement: virtual joystick (the d-pad vibe)
 
-- **Tap a walkable tile** → the hero paths there using the existing BFS
-  (`npcStep`-style), one real `tryMove` per animation tick (~120 ms), so
-  every step pays its turn honestly. Any hostile within sight aborts
-  auto-walk (no pathing into ambushes).
-- **Tap an adjacent tile** = single step (precision).
-- **Swipe anywhere on canvas** = single step in swipe direction (the
-  D-pad for people who hate D-pads).
-- Optional **virtual D-pad toggle** in settings for purists; hidden by
-  default.
+- **Fixed joystick, bottom-left**: a semi-transparent ring with a knob.
+  Touch and drag; direction resolves to the dominant axis (the game is
+  4-way). Dead zone ~16 px so resting a thumb does nothing.
+- **Hold to walk**: first step fires on engage, then repeats every
+  ~170 ms while held — exactly the cadence of holding an arrow key.
+  Release stops instantly.
+- Implemented by dispatching the real Arrow key events, so the entire
+  existing input stack (bump-attack, direction prompts after T/F,
+  overlay dismissal) works untouched — aiming a cannon is "tap ⚔, flick
+  the stick."
+- Tap-to-move shelved (kept here for the record); swipe-step dropped.
 
 ## Context actions by tap (the U7 rule: tap the thing)
 
