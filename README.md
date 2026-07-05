@@ -68,7 +68,7 @@ thy progress.
 | M | meditate at a shrine |
 | G | open a chest |
 | B / X | board or cross ships / go ashore |
-| H | camp |
+| H | camp in the wilds; rest at the inn in towns |
 | P | peer at the world map (fog of war) |
 | Z | stats & proven mantras |
 | V | toggle music |

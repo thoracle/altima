@@ -3203,7 +3203,21 @@ function cmdExitShip(){
 }
 
 function cmdCamp(){
-  if(inLoc) return msg("Rest at an inn — or outside town.","m-sys");
+  if(inLoc){
+    if(inLoc.raid) return msg("No rest while foes prowl the streets!","m-bad");
+    if(!TOWN_KEYS.includes(inLoc.key)) return msg("No inn keeps beds here.","m-sys");
+    const cost = inLoc.key==="town2" ? 15 : 10;   // Skullhaven charges harbor rates
+    if(P.gold<cost) return msg(`The innkeeper wants ${cost} gold for a bed. Thou hast not the coin.`,"m-sys");
+    askYesNo(`A warm bed at the tavern — ${cost} gold buys rest till dawn, meals included. Take it? (Y/N)`,
+      ()=>{ P.gold-=cost;
+        P.hp=P.maxhp; P.poison=false;
+        turns=Math.ceil((turns+1)/400)*400;   // sleep to first light
+        sfx.virtue();
+        msg("Thou sleepest deep and wakest at dawn, whole and well fed.","m-good");
+        renderStats(); render(); },
+      ()=>msg('"Suit thyself. The road is cold."',"m-say"));
+    return;
+  }
   if(P.onShip) return msg("Thou canst not camp upon the waves.","m-sys");
   const near=monsters.some(m=>Math.abs(m.x-P.x)<5&&Math.abs(m.y-P.y)<5);
   if(near) return msg("Monsters prowl too close to rest!","m-bad");
@@ -3384,7 +3398,7 @@ document.addEventListener("keydown",e=>{
          T — talk (then direction) · F — attack, or cannons at sea<br>
          E — enter town/castle/dungeon, climb ladders<br>
          M — meditate at shrine · G — get chest · P — peer at map<br>
-         B — board or cross to adjacent ship · X — go ashore · H — camp<br>
+         B — board or cross to adjacent ship · X — go ashore · H — camp / inn in town<br>
          Z — ztats · Shift+S — save · Space — pass<br><br>
          Raise all eight virtues to 80 to become the Saint.<br>
          Shrines sleep until their hidden RUNE is found — ask the folk.<br>
