@@ -211,6 +211,8 @@ whirl :{px:["..www...",".w...w..","w..ww.w.","w.w..w.w","w.w.ww.w",".w....w.",".
         pal:{".":null,"w":"#7fd9ff"}},
 rider :{px:["...hh...","..bbb...",".mmmmmmM",".mmmmmm.",".m.mm.m.",".m.mm.m.","........","........"],
         pal:{".":null,"h":"#f2c896","b":"#6fa8ff","m":"#7a4e22","M":"#9a6e3a"}},
+basilisk:{px:["........","g.....g.",".gggggg.","geegggg.",".gggggg.","..gggg..",".g.g.g.g","........"],
+        pal:{".":null,"g":"#a8c83a","e":"#ff4a4a"}},
 cave  :{px:["........","..aaaa..",".aaaaaa.","aaa00aaa","aa0000aa","aa0000aa","aaaaaaaa","........"],
         pal:{".":"#2e9a2e","a":"#8a8a8a","0":"#0a0a0a"}},
 dwall :{px:["bbbbbbbb","b...b...","bbbbbbbb","..b...b.","bbbbbbbb","b...b...","bbbbbbbb","..b...b."],
@@ -251,6 +253,8 @@ SPR.pirate  = humanoid("#d8a878","#1a0a0a","#3a3a3a","#8a2a2a");
 SPR.lich    = humanoid("#d8ffd8","#0a1a0a","#2a3a2a","#1a2a1a");
 SPR.cultist = humanoid("#e8d8c8","#1a0a0a","#5a1a2a","#3a0a1a");
 SPR.shadow  = humanoid("#3a3a4e","#0a0a14","#2a2a3e","#1a1a2e");
+SPR.wraith  = humanoid("#6a74a8","#0a0a14","#3a3a5e","#2a2a4e");
+SPR.demon   = humanoid("#ff6a3a","#000000","#a82222","#7a1a1a");
 
 // bake sprites to offscreen canvases
 const SPRC = {};
@@ -542,7 +546,8 @@ castle:{
        barrow:"The Silver Barrow was sealed before the castle's first stone. The Barrow King took its key into death with him.",
        silver:"A silver lock, a silver key — and within, they say, a blade quenched in moonlight.",
        mantra:"The mantra of Humility, MEK, is whispered by the jester of Ironfast.",
-       spell:"Magic left this land with the old shrines. Only virtue remains." }},
+       spell:"Magic left this land with the old shrines — but its RELICS remain, sleeping in the deep places.",
+       relic:"Nine relics of the old magic survive. Six lie at the very bottoms of the dungeons; the rest ride with drowned captains and dead kings." }},
    "5":{name:"Pip the Page",spr:"bard",peace:true,
      greet:"A small page bows deeply.",
      lines:{ job:"I run messages! And I listen at doors.",
@@ -954,6 +959,10 @@ const MONST={
   pirate  :{name:"brigand",    spr:"pirate",  hp:20, dmg:10, ac:2, xp:26, gold:[8,26], water:false},
   pirateShip:{name:"pirate ship",spr:"pships",hp:40, dmg:12, ac:4, xp:44, gold:[20,60],water:true, ranged:3, capture:true},
   kraken  :{name:"kraken",     spr:"kraken",  hp:46, dmg:18, ac:3, xp:64, gold:[0,0],  water:true},
+  // the deep-dark bestiary — dungeon levels 4 and 5 only
+  wraith  :{name:"wraith",     spr:"wraith",  hp:40, dmg:18, ac:4, xp:80, gold:[10,30],water:false, ranged:2},
+  basilisk:{name:"basilisk",   spr:"basilisk",hp:36, dmg:14, ac:3, xp:70, gold:[8,24], water:false, poison:true},
+  demon   :{name:"demon",      spr:"demon",   hp:60, dmg:22, ac:5, xp:150,gold:[30,80],water:false, ranged:2},
 };
 function spawnTable(){
   const lvl=P.level;
@@ -971,9 +980,35 @@ function spawnTable(){
 }
 
 //---------------------------------------------------------------
+// 6a2. Relics — the old magic survives only as artifacts, hidden
+// in the dungeons' depths and the spoils of the hardest raids
+//---------------------------------------------------------------
+const RELICS={
+  cloak:  {name:"Cloak of Shadows",     tip:"foes notice thee at half the distance; thy camps are never ambushed"},
+  aegis:  {name:"Ring of Protection",   tip:"+2 defense, always"},
+  regen:  {name:"Ring of Regeneration", tip:"thou healest 1 HP every 3 turns"},
+  serpent:{name:"Serpent Amulet",       tip:"venom cannot touch thee"},
+  sandals:{name:"Pilgrim's Sandals",    tip:"swamps and flames harm thee not"},
+  might:  {name:"Gauntlets of Might",   tip:"+3 melee damage"},
+  sextant:{name:"Sextant",              tip:"reveals thy position in the world"},
+  crown:  {name:"Crown of Bone",        tip:"the dead strike thee -3"},
+  ankh:   {name:"Ankh of Rebirth",      tip:"cheats death — once"},
+};
+const DUNGEON_RELICS=["cloak","aegis","regen","serpent","sandals","might"]; // by dungeon index
+function grantRelic(id,how){
+  if(P.relicsFound[id]) return false;
+  P.relicsFound[id]=true; P.relics[id]=true;
+  msg(`${how} — the ${RELICS[id].name.toUpperCase()}!`,"m-gold");
+  msg(`(${RELICS[id].tip}.)`,"m-sys");
+  sfx.level(); renderStats();
+  return true;
+}
+const UNDEAD_SPR={skeleton:1,ghost:1,lich:1,wraith:1};
+
+//---------------------------------------------------------------
 // 6b. Dungeons — rogue-style rooms & corridors, same top-down view
 //---------------------------------------------------------------
-const DW=40, DH=40, DLEV=3;
+const DW=40, DH=40, DLEV=5;
 function genDunLevel(di,lvl){
   const rr=mulberry32((WORLD_SEED*31 + di*7919 + lvl*104729)|0);
   const ri2=(a,b)=>a+Math.floor(rr()*(b-a+1));
@@ -997,7 +1032,7 @@ function genDunLevel(di,lvl){
   const last=rooms[rooms.length-1];
   let down=null; const lvChests=[];
   if(lvl<DLEV-1){ down={x:last.cx,y:last.cy}; g[down.y*DW+down.x]=T.LADDD; }
-  else {                                     // deepest level: the hoard
+  else {                                     // deepest level: the hoard and its relic
     const rich = di>=4 ? 2.5 : 1;            // treasure-isle dungeons pay far better
     const spots=[[-1,0],[1,0],[0,-1],[0,1]];
     for(const[ox,oy]of spots){
@@ -1005,9 +1040,12 @@ function genDunLevel(di,lvl){
       if(g[cy2*DW+cx2]===T.DFLOOR)
         lvChests.push({x:cx2,y:cy2,gold:Math.round((60+Math.floor(rr()*90))*rich),honor:true});
     }
+    if(DUNGEON_RELICS[di])
+      lvChests.push({x:last.cx,y:last.cy,gold:50,relic:DUNGEON_RELICS[di]});
   }
-  const tables=[["rat","snake","orc"],["orc","skeleton","ghost"],["skeleton","ghost","troll"]];
-  const tbl=tables[Math.min(lvl,2)], mobs=[];
+  const tables=[["rat","snake","orc"],["orc","skeleton","ghost"],["skeleton","ghost","troll"],
+                ["troll","wraith","basilisk"],["wraith","basilisk","demon"]];
+  const tbl=tables[Math.min(lvl,4)], mobs=[];
   for(let k=0;k<7+lvl*3;k++){
     const r=rooms[1+Math.floor(rr()*(rooms.length-1))];
     const x=ri2(r.x,r.x+r.w-1), y=ri2(r.y,r.y+r.h-1);
@@ -1015,11 +1053,11 @@ function genDunLevel(di,lvl){
     const key=tbl[Math.floor(rr()*tbl.length)], def=MONST[key];
     mobs.push({key,name:def.name,spr:def.spr,x,y,hp:def.hp+lvl*4,dmg:def.dmg+lvl*2,
                ac:def.ac,xp:def.xp+lvl*8,gold:[def.gold[0]+lvl*4,def.gold[1]+lvl*8],
-               water:false,poison:def.poison});
+               water:false,poison:def.poison,ranged:def.ranged});
   }
   return {grid:g, mobs, chests:lvChests, up, down, heart:{x:last.cx,y:last.cy}};
 }
-const GLOOM_HEART = genDunLevel(0,2).heart;   // where the Rune of Honor sleeps
+const GLOOM_HEART = genDunLevel(0,DLEV-1).heart;   // where the Rune of Honor sleeps, at the very bottom
 
 //---------------------------------------------------------------
 // 6c. The Eight Runes — hidden where their virtues live
@@ -1038,7 +1076,7 @@ function runeHere(){
   for(const r of RUNESPOTS){
     if(P.runes[r.v]) continue;
     if(r.loc==="gloom3"){
-      if(inDun && inDun.idx===0 && inDun.lvl===2 && P.x===GLOOM_HEART.x && P.y===GLOOM_HEART.y) return r.v;
+      if(inDun && inDun.idx===0 && inDun.lvl===DLEV-1 && P.x===GLOOM_HEART.x && P.y===GLOOM_HEART.y) return r.v;
     } else if(r.loc==="humisle"){
       if(!inLoc && !inDun && P.x===SHRINES[7].x && P.y===SHRINES[7].y+1) return r.v;
     } else if(inLoc && !inLoc.raid && inLoc.key===r.loc && P.x===r.x && P.y===r.y) return r.v;
@@ -1090,6 +1128,10 @@ function dungeonLadder(){
   if(t===T.LADDD){
     loadDunLevel(inDun.lvl+1,"up");
     msg(`Thou climbest down to level ${inDun.lvl+1} of ${DUNGEONS[inDun.idx].name}.`,"m-blue");
+    if(inDun.lvl>=3 && !inDun.warned){
+      inDun.warned=true;
+      msg("The air grows wrong here. Older things than trolls dig these depths.","m-bad");
+    }
     sfx.gate(); render();
   } else if(t===T.LADDU){
     if(inDun.lvl===0){ exitDungeon(); return; }
@@ -1109,7 +1151,8 @@ function newGame(){
       ratsDone:false, desec:null, lastDesec:0, cultWar:0, dragonAwake:false, dragonSlain:false,
       lastAmbush:0, lastGhost:0, risen:false, risenDone:false,
       plot:null, plotDone:false, trialDone:false, trialHinted:false, trialNagged:false,
-      runes:[false,false,false,false,false,false,false,false], bow:false, horse:false, horseStep:false };
+      runes:[false,false,false,false,false,false,false,false], bow:false, horse:false, horseStep:false,
+      relics:{}, relicsFound:{} };
   ghostShip=null;
   // ensure start tile walkable
   if(!WALK_LAND.has(gw(P.x,P.y))){ sw(P.x,P.y,T.GRASS); }
@@ -1299,11 +1342,15 @@ function renderStats(){
   html+=`<div class="srow"><span>Armor</span><b>${a.name}</b></div>`;
   if(P.horse) html+=`<div class="srow"><span>Mount</span><b>Horse</b></div>`;
   html+=`<div class="srow"><span>Runes</span><b>${P.runes.filter(Boolean).length}/8</b></div>`;
+  const nr=Object.values(P.relics).filter(Boolean).length;
+  if(nr) html+=`<div class="srow"><span>Relics</span><b style="color:var(--blue)">${nr}/9</b></div>`;
   if(P.silverKey) html+=`<div class="srow"><span>Key</span><b style="color:#cfd8e8">Silver</b></div>`;
   html+=`<div class="srow"><span>Moons</span><b>${moons[phase%3]} gate ${phase+1}</b></div>`;
   html+=`<div class="srow"><span>Time</span><b>${inDun?"dark":"" || (isNight()?"night":"day")} · t${turns}</b></div>`;
   html+=`<div class="srow"><span>Place</span><b>${
     inDun? `${DUNGEONS[inDun.idx].name} L${inDun.lvl+1}` : inLoc? LOCS[inLoc.key].name : "Albion"}</b></div>`;
+  if(P.relics.sextant && !inLoc && !inDun)
+    html+=`<div class="srow"><span>Sextant</span><b>${P.x}°E ${P.y}°S</b></div>`;
   html+=`<h3 style="margin-top:8px">VIRTUES</h3>`;
   VIRTUES.forEach((v,i)=>{
     const val=P.virtues[i];
@@ -1369,7 +1416,7 @@ function tryMove(dx,dy){
       ? "A ladder climbs toward daylight. Press E to leave."
       : "A ladder climbs upward. Press E.","m-blue");
   } else if(!inLoc){
-    if(t===T.SWAMP && R()<.15) poisonPlayer("Poisoned by the swamp!");
+    if(t===T.SWAMP && R()<.15 && !P.relics.sandals) poisonPlayer("Poisoned by the swamp!");
     if(t===T.TOWN||t===T.CASTLE) msg(`${t===T.CASTLE?"Castle Lumen":townName(nx,ny)} — press E to enter.`,"m-blue");
     if(t===T.SHRINE){
       const si=shrineIndex(nx,ny);
@@ -1395,10 +1442,13 @@ function tryMove(dx,dy){
     if(g && g.x===nx && g.y===ny) enterGate();
   }
   if(inLoc && inLoc.raid && tileAt(nx,ny)===T.FIRE){
-    const burn=ri(3,6);
-    P.hp-=burn; sfx.hurt();
-    msg(`The flames sear thee for ${burn}!`,"m-bad");
-    if(P.hp<=0){ playerDeath(); return; }
+    if(P.relics.sandals) msg("The flames part around thy sandals.","m-blue");
+    else {
+      const burn=ri(3,6);
+      P.hp-=burn; sfx.hurt();
+      msg(`The flames sear thee for ${burn}!`,"m-bad");
+      if(P.hp<=0){ playerDeath(); return; }
+    }
   }
   if((!inLoc||inLoc.raid) && chests.some(c=>c.x===nx&&c.y===ny))
     msg("A chest lies here — press G to open it.","m-gold");
@@ -1798,11 +1848,16 @@ function startRaid(key,kind){
 //---------------------------------------------------------------
 function mN(m){ return m.proper? m.name : "the "+m.name; }
 function mNC(m){ return m.proper? m.name : "The "+m.name; }
+function defAgainst(m){   // armor plus relic wards
+  return ARMORS[P.armor].def
+       + (P.relics.aegis?2:0)
+       + ((P.relics.crown && UNDEAD_SPR[m.spr])?3:0);
+}
 function attackMonster(m){
   const w=WEAPONS[P.weapon];
   const hitCh=.75 + P.level*.04 - m.ac*.05;
   if(R()<hitCh){
-    const dmg=ri(w.min,w.max)+Math.floor(P.level/2);
+    const dmg=ri(w.min,w.max)+Math.floor(P.level/2)+(P.relics.might?3:0);
     m.hp-=dmg; sfx.hit();
     msg(`Thou strikest ${mN(m)} for ${dmg}!`,"m-say");
     if(m.hp<=0) killMonster(m);
@@ -1846,6 +1901,7 @@ function killMonster(m){
       virtue(6,4,"Thou hast faced the dark beyond the gate.");
       virtue(2,3);
       sfx.level();
+      if((P.undeadWar||0)>=2) grantRelic("crown","From the Barrow King's shattered brow");
       msg("(The moons will darken again. The dead grow restless...)","m-sys");
       return;
     }
@@ -1913,6 +1969,7 @@ function killMonster(m){
       ships.push(gs); ghostShip=null;
       msg("The Drowned Captain smiles, and his crew falls to peaceful dust.","m-good");
       msg("THE PALE SHIP IS THINE — her spectral hull shrugs off half of every blow.","m-gold");
+      grantRelic("sextant","In the captain's cabin thou findest");
       virtue(6,3,"Thou hast given the drowned their rest.");
       sfx.level();
       return;
@@ -1922,6 +1979,7 @@ function killMonster(m){
       P.gold+=400;
       msg("The eighth captain crumbles. The barrow-earth settles, satisfied.","m-good");
       msg("Among the graves: 400 gold in grave-tribute.","m-gold");
+      grantRelic("ankh","Set upon the oldest grave");
       virtue(5,5,"Thou gavest them the ends they earned.");
       virtue(2,4);
       sfx.level();
@@ -2024,7 +2082,7 @@ function monsterTurn(){
         m.hasHit=true;
         if(P.onShip && !inLoc){ hullHit(Math.max(1,raw),m.name); if(mode==="dead") return; }
         else {
-          const dmg=Math.max(1,raw-ARMORS[P.armor].def);
+          const dmg=Math.max(1,raw-defAgainst(m));
           P.hp-=dmg; sfx.hurt();
           msg(`${mNC(m)} hits thee for ${dmg}!`,"m-bad");
           if(m.poison && R()<.2) poisonPlayer("Thou art poisoned!");
@@ -2051,7 +2109,7 @@ function monsterTurn(){
           hullHit(raw,what); if(mode==="dead") return;
         }
         else {
-          const dmg=Math.max(1,raw-ARMORS[P.armor].def);
+          const dmg=Math.max(1,raw-defAgainst(m));
           P.hp-=dmg; sfx.hurt();
           msg(`A ${what} from ${mN(m)} strikes thee for ${dmg}!`,"m-bad");
           if(P.hp<=0){ playerDeath(); return; }
@@ -2059,7 +2117,7 @@ function monsterTurn(){
         continue;
       }
     }
-    if(dist>10) continue;
+    if(dist > (P.relics.cloak?5:10)) continue;   // the cloak dims thee in their eyes
     // step toward player
     const opts=[];
     if(dx!==0) opts.push([Math.sign(dx),0]);
@@ -2111,6 +2169,13 @@ function cullMonsters(){
 }
 
 function playerDeath(){
+  if(P.relics && P.relics.ankh){
+    delete P.relics.ankh;
+    P.hp=Math.max(1,Math.floor(P.maxhp/2));
+    msg("The ANKH OF REBIRTH burns to ash upon thy breast — and thy heart beats again!","m-gold");
+    sfx.level(); render();
+    return;
+  }
   sfx.die();
   mode="dead";
   showOverlay("THOU ART SLAIN",
@@ -2134,6 +2199,7 @@ function respawn(){
 //---------------------------------------------------------------
 function poisonPlayer(text){
   if(P.poison) return;
+  if(P.relics.serpent){ msg("Thy amulet flares — the venom dies at thy throat.","m-blue"); return; }
   P.poison=true; P.poisonT=turns;
   msg(text,"m-bad"); sfx.hurt();
 }
@@ -2148,6 +2214,7 @@ function tick(){
     if(turns-(P.poisonT||0)>30){ P.poison=false; msg("The venom runs its course. Thou art well again.","m-good"); }
     else if(turns%3===0){ P.hp--; if(turns%9===0) msg("The poison burns...","m-bad"); }
   }
+  if(P.relics.regen && turns%3===0 && P.hp<P.maxhp) P.hp++;
   if(P.hp<=0){ playerDeath(); render(); return; }
   monsterTurn();
   if((mode==="play"||mode==="won") && !inDun && !inLoc) { spawnMonsters(); cullMonsters(); }
@@ -2445,6 +2512,7 @@ function cmdGet(){
   if(R()<.15) poisonPlayer("A poison needle pricks thee!");
   P.gold+=c.gold; sfx.gold();
   msg(`Thou openest the chest: ${c.gold} gold!`,"m-gold");
+  if(c.relic) grantRelic(c.relic,"Beneath the coin, wrapped in oilcloth");
   if(c.honor && inDun){
     P.dunHonor=P.dunHonor||{};
     if(!P.dunHonor[inDun.idx]){
@@ -2527,7 +2595,7 @@ function cmdCamp(){
   if(near) return msg("Monsters prowl too close to rest!","m-bad");
   if(P.food<5) return msg("Thou hast not food enough to camp.","m-bad");
   // a heavy purse sleeps loud
-  if(!inDun && P.gold>=300 && turns-(P.lastAmbush||0)>300 && R()<.25){
+  if(!inDun && !P.relics.cloak && P.gold>=300 && turns-(P.lastAmbush||0)>300 && R()<.25){
     P.lastAmbush=turns;
     startRaid("camp","ambush");
     return;
@@ -2548,6 +2616,9 @@ function cmdZtats(){
   const proven=Object.keys(P.shrineCd||{}).map(k=>+k.slice(1)).sort((a,b)=>a-b);
   if(proven.length)
     msg(`Mantras proven: ${proven.map(i=>`${MANTRAS[i]}=${VIRTUES[i].slice(0,4)}`).join(" · ")}`,"m-blue");
+  const owned=Object.keys(P.relics).filter(k=>P.relics[k]);
+  if(owned.length)
+    msg(`Relics: ${owned.map(k=>RELICS[k].name).join(", ")}`,"m-blue");
   msg(`Shrines answer at 80+ in all eight virtues → Sainthood.`,"m-sys");
 }
 
@@ -2589,6 +2660,9 @@ function load(){
     P.runes=(Array.isArray(P.runes)&&P.runes.length===8)? P.runes.map(v=>!!v)
       : VIRTUES.map((_,i)=>!!P.shrineCd["s"+i]);   // old saves: grant runes for shrines already proven
     P.bow=!!P.bow; P.horse=!!P.horse; P.horseStep=false;
+    const cleanRelics=o=>(o&&typeof o==="object")
+      ? Object.fromEntries(Object.keys(RELICS).filter(k=>o[k]).map(k=>[k,true])) : {};
+    P.relics=cleanRelics(P.relics); P.relicsFound=cleanRelics(P.relicsFound);
     if(P.siege && !(Number.isInteger(P.siege.town)&&P.siege.town>=0&&P.siege.town<=1)) P.siege=null;
     if(P.moonCurse && !(Number.isInteger(P.moonCurse.gate)&&GATES[P.moonCurse.gate])) P.moonCurse=null;
     if(P.desec && !(Number.isInteger(P.desec.v)&&P.desec.v>=0&&P.desec.v<8)) P.desec=null;
@@ -2686,7 +2760,8 @@ document.addEventListener("keydown",e=>{
          Raise all eight virtues to 80 to become the Saint.<br>
          Shrines sleep until their hidden RUNE is found — ask the folk.<br>
          A bow lets F strike at range; a horse halves overland travel.<br>
-         Dungeons hide treasure. Sunk pirates yield their ships.`,
+         Nine magic RELICS sleep in the dungeons' five-deep dark<br>
+         and in the spoils of the hardest raids. Sunk pirates yield ships.`,
         "— PRESS ANY KEY —");
       break;
   }

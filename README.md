@@ -30,10 +30,14 @@ thy progress.
 - Procedural overworld (fixed seed) with towns, castle, dungeons, shrines,
   moongates, and ship-only islands
 - Keyword-based NPC dialogue (type NAME, JOB, MANTRA, ...)
-- Roguelike bump combat everywhere: overworld, 3-level dungeons, and a
+- Roguelike bump combat everywhere: overworld, 5-level dungeons, and a
   dozen raid scenarios (pirate sieges, undead moongate incursions, shrine
   desecrations, a dragon that burns towns, a deck fight for a ghost ship,
   a whodunit in the castle court, and more)
+- Nine magic relics with passive powers (regeneration, poison immunity,
+  a death-cheating ankh...) hidden at the bottoms of the dungeons and in
+  the spoils of the hardest raids — guarded by wraiths, basilisks, and
+  demons in the deep dark
 - Naval play: capturable pirate ships, cannon broadsides, hull damage,
   krakens, a wandering whirlpool
 - A bow for ranged attacks, and horses that halve overland travel
