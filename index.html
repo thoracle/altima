@@ -170,7 +170,20 @@ const TUNES={
          [64,.75],[67,.75],[71,.75],[69,.75],[67,.75],[64,.75],[65,.75],[62,.75],[64,1.5],[0,.75]],
     bass:[[33,1.5],[40,1.5],[38,1.5],[36,1.5],[33,1.5],[29,1.5],[31,1.5],[33,1.5]]},
 };
-const MUS={on: localStorage.getItem("altima-music")!=="off", tune:null, mi:0, bi:0, mNext:0, bNext:0, timer:null};
+const MUS={on: localStorage.getItem("altima-music")!=="off", tune:null, mi:0, bi:0, mNext:0, bNext:0, timer:null, live:[]};
+function killNotes(){   // silence everything scheduled — no bleed across tune changes
+  if(!AC) return;
+  const now=AC.currentTime;
+  for(const n of MUS.live){
+    try{
+      n.g.gain.cancelScheduledValues(now);
+      n.g.gain.setValueAtTime(n.g.gain.value,now);
+      n.g.gain.linearRampToValueAtTime(.0001,now+.08);
+      n.o.stop(now+.1);
+    }catch(e){}
+  }
+  MUS.live=[];
+}
 const mf=n=> n? 440*Math.pow(2,(n-69)/12) : 0;
 function mNote(freq,t,dur,type,vol){
   if(!freq) return;
@@ -182,6 +195,7 @@ function mNote(freq,t,dur,type,vol){
   g.gain.linearRampToValueAtTime(.0001,t+dur*.95);
   o.connect(g); g.connect(AC.destination);
   o.start(t); o.stop(t+dur);
+  MUS.live.push({o,g,end:t+dur});
 }
 function musicPump(){
   if(!MUS.on || !AC || !MUS.tune) return;
@@ -189,6 +203,7 @@ function musicPump(){
     const T=TUNES[MUS.tune], spb=60/T.bpm, edge=AC.currentTime+.5;
     if(MUS.mNext<AC.currentTime) MUS.mNext=AC.currentTime+.05;
     if(MUS.bNext<AC.currentTime) MUS.bNext=AC.currentTime+.05;
+    MUS.live=MUS.live.filter(n=>n.end>AC.currentTime);   // prune finished notes
     while(MUS.mNext<edge){ const[n,d]=T.mel[MUS.mi++%T.mel.length];  mNote(mf(n),MUS.mNext,d*spb,T.mtype||"square",.02);   MUS.mNext+=d*spb; }
     while(MUS.bNext<edge){ const[n,d]=T.bass[MUS.bi++%T.bass.length]; mNote(mf(n),MUS.bNext,d*spb,T.btype||"triangle",.022); MUS.bNext+=d*spb; }
   }catch(e){}
@@ -203,6 +218,7 @@ function updateTune(){
     : (P&&gw(P.x,P.y)===T.SHRINE)? "shrine"
     : "world";
   if(MUS.tune===name) return;
+  killNotes();
   MUS.tune=name; MUS.mi=0; MUS.bi=0;
   if(AC){ MUS.mNext=AC.currentTime+.15; MUS.bNext=AC.currentTime+.15; }
 }
@@ -3025,6 +3041,7 @@ document.addEventListener("keydown",e=>{
 //---------------------------------------------------------------
 function toggleMusic(){
   MUS.on=!MUS.on;
+  if(!MUS.on) killNotes();
   localStorage.setItem("altima-music",MUS.on?"on":"off");
   $("sndbtn").textContent=MUS.on?"🎵":"🔇";
   if(mode!=="title") msg(MUS.on?"The minstrels play on.":"The minstrels fall silent.","m-sys");
