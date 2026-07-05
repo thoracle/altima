@@ -1500,7 +1500,7 @@ function genDunLevel(di,lvl){
   const tables=[["rat","snake","orc"],["orc","skeleton","ghost"],["skeleton","ghost","troll"],
                 ["troll","wraith","basilisk"],["wraith","basilisk","demon"]];
   const tbl=tables[Math.min(lvl,4)], mobs=[];
-  for(let k=0;k<7+lvl*3;k++){
+  for(let k=0;k<7+lvl*2;k++){
     const r=rooms[1+Math.floor(rr()*(rooms.length-1))];
     const x=ri2(r.x,r.x+r.w-1), y=ri2(r.y,r.y+r.h-1);
     if(g[y*DW+x]!==T.DFLOOR || mobs.some(m=>m.x===x&&m.y===y)) continue;
