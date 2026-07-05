@@ -3018,6 +3018,9 @@ const KEYDIR={ArrowUp:"up",ArrowDown:"down",ArrowLeft:"left",ArrowRight:"right",
               w:"up",s:"down",a:"left",d:"right",W:"up",S:"down",A:"left",D:"right"};
 document.addEventListener("keydown",e=>{
   ensureMusic();
+  // bare modifiers and OS shortcut chords (Ctrl/Alt/Cmd + key) are not game input
+  if(["Shift","Control","Alt","Meta","CapsLock","NumLock","ScrollLock","Fn"].includes(e.key)) return;
+  if(e.metaKey || e.ctrlKey || e.altKey) return;
   if(mode==="text") return; // input has focus
   if(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"," "].includes(e.key)) e.preventDefault();
 
