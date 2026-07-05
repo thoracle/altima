@@ -39,8 +39,12 @@ thy progress.
   (shops keep hours; guards, healers, and pirates never rest); dogs,
   cats, and chickens wander the streets; innkeepers rent beds and
   pour rumors for a round of drinks; unwatched counters tempt thieves
-  (and towns remember a caught one); Skullhaven runs a crooked dice
-  den; and the ruined town of Vainglory keeps its ghosts
+  (and towns remember a caught one — with witness-based odds: rob
+  empty shops at night or answer to whoever saw); Skullhaven runs a
+  crooked dice den; the ruined town of Vainglory keeps its ghosts;
+  every conversation shows the speaker's portrait; and the folk
+  gossip about the world's actual news — sieges, desecrations, slain
+  wardens, thy own deeds
 - IM-style dialogue: topics, shop wares, and yes/no questions appear
   as clickable reply chips (numbers and free typing still work) —
   secrets still hide behind unlisted words, and the folk greet a
