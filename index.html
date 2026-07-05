@@ -734,8 +734,9 @@ town0:{
   "gg####,,,,,,,####gg",
   "g,,,,,,,,,,,,,,,,,g",
   "g#D####,#D##,#D##,g",
-  "g#...C#,#B.#,#B.#,g",
-  "g######,####,####,g",
+  "g#....#,#B.#,#B.#,g",
+  "g#..C.#,####,####,g",
+  "g######,,,,,,,,,,,g",
   "ggggggggggggggggggg",
   ]),
   npcs:{
@@ -796,8 +797,9 @@ town1:{
   "gg,,,,,,,@,,,,,,,gg",
   "g,,,,,,,,,,,,,,,,,g",
   "g#D####,#D##,#D##,g",
-  "g#...C#,#B.#,#B.#,g",
-  "g######,####,####,g",
+  "g#....#,#B.#,#B.#,g",
+  "g#..C.#,####,####,g",
+  "g######,,,,,,,,,,,g",
   "ggggggggggggggggggg",
   ]),
   npcs:{
@@ -863,8 +865,9 @@ town2:{
   "g,,,,,,~~~,,,,,,g",
   "g,,,,,,,,,,,,,,,g",
   "g#D####,#D##,,,,g",
-  "g#...C#,#B.#,,,,g",
-  "g######,####,,,,g",
+  "g#....#,#B.#,,,,g",
+  "g#..C.#,####,,,,g",
+  "g######,,,,,,,,,g",
   "ggggggggggggggggg",
   ]),
   npcs:{
@@ -927,8 +930,9 @@ willowdale:{
   "g,t,,####,,t,,,,,,g",
   "g,,,,,,,,,,,,,,,,,g",
   "g#D####,#D##,#D##,g",
-  "g#...C#,#B.#,#B.#,g",
-  "g######,####,####,g",
+  "g#....#,#B.#,#B.#,g",
+  "g#..C.#,####,####,g",
+  "g######,,,,,,,,,,,g",
   "ggggggggggggggggggg",
   ]),
   npcs:{
@@ -982,8 +986,9 @@ goldport:{
   "g,####,####,,,,,,,g",
   "g,,,,,,,,,,,,,,,,,g",
   "g#D####,#D##,#D##,g",
-  "g#...C#,#B.#,#B.#,g",
-  "g######,####,####,g",
+  "g#....#,#B.#,#B.#,g",
+  "g#..C.#,####,####,g",
+  "g######,,,,,,,,,,,g",
   "ggggggggggggggggggg",
   ]),
   npcs:{
@@ -1038,8 +1043,9 @@ stonevale:{
   "gwwwwwww,wwwwwwwg",
   "g,,,,,,,,,,,,,,,g",
   "g#D####,#D##,,,,g",
-  "g#...C#,#B.#,,,,g",
-  "g######,####,,,,g",
+  "g#....#,#B.#,,,,g",
+  "g#..C.#,####,,,,g",
+  "g######,,,,,,,,,g",
   "ggggggggggggggggg",
   ]),
   npcs:{
@@ -1212,21 +1218,56 @@ const TOWN_KEYS=["town0","town1","willowdale","goldport","stonevale","town2"];
     if(n) Object.assign(n,data); };
   A("castle","Lumen",{always:1}); A("castle","Gareth",{always:1}); A("castle","Souls",{always:1});
   A("castle","Cedric",{h:[17,3]}); A("castle","Pip",{s:[7,7],h:[2,10]});
-  A("town0","Ana",{always:1,s:[3,16],h:[9,16]}); A("town0","Tam",{s:[4,16]});
-  A("town0","Lyra",{s:[2,16],h:[2,16]}); A("town0","Marla",{h:[14,16]});
-  A("town1","Grimm",{s:[2,13]}); A("town1","Wystan",{s:[3,13],h:[9,13]});
-  A("town1","Fenn",{s:[4,13],h:[14,13]}); A("town1","Hilda",{h:[15,13]});
+  A("town0","Ana",{always:1,s:[3,17],h:[9,16]}); A("town0","Tam",{s:[5,17],h:[5,17]});
+  A("town0","Lyra",{s:[2,17],h:[2,17]}); A("town0","Marla",{h:[14,16]});
+  A("town1","Grimm",{s:[2,14]}); A("town1","Wystan",{s:[3,14],h:[9,13]});
+  A("town1","Fenn",{s:[5,14],h:[14,13]}); A("town1","Hilda",{h:[15,13]});
   A("town1","Roke",{always:1});
-  A("willowdale","Etta",{always:1}); A("willowdale","Col",{s:[3,14],h:[9,14]});
-  A("willowdale","Bess",{s:[4,14],h:[14,14]}); A("willowdale","Puck",{always:1,s:[2,14]});
-  A("goldport","Hale",{s:[2,15]}); A("goldport","Ives",{s:[3,15],h:[9,15]});
-  A("goldport","Rena",{always:1,s:[4,15]}); A("goldport","Wick",{h:[14,15]});
+  A("willowdale","Etta",{always:1}); A("willowdale","Col",{s:[3,15],h:[9,14]});
+  A("willowdale","Bess",{s:[5,15],h:[14,14]}); A("willowdale","Puck",{always:1,s:[2,15]});
+  A("goldport","Hale",{s:[2,16]}); A("goldport","Ives",{s:[3,16],h:[9,15]});
+  A("goldport","Rena",{always:1,s:[5,16]}); A("goldport","Wick",{h:[14,15]});
   A("town2","Meg",{always:1}); A("town2","Silas",{always:1,s:[7,2],h:[9,15]});
   A("town2","Rafe",{always:1,s:[7,3]}); A("town2","Scab",{always:1,s:[9,3],h:[10,15]});
   A("town2","Salt",{always:1,s:[9,2]});
-  A("stonevale","Brakk",{s:[2,15]}); A("stonevale","Iva",{always:1});
-  A("stonevale","Oth",{s:[3,15],h:[9,15]}); A("stonevale","Guss",{s:[4,15]});
+  A("stonevale","Brakk",{s:[2,16]}); A("stonevale","Iva",{always:1});
+  A("stonevale","Oth",{s:[3,16],h:[9,15]}); A("stonevale","Guss",{s:[5,16]});
 })();
+function npcStep(n,sp){   // first step of the shortest walkable path (interiors are tiny — BFS is cheap)
+  return bfsStep(n,sp,true) || bfsStep(n,sp,false);  // route around bodies; queue through them as a last resort
+}
+function bfsStep(n,sp,solid){
+  const W2=inLoc.w, H2=inLoc.h;
+  const prev=new Int32Array(W2*H2).fill(-1);
+  const startI=n.y*W2+n.x, goalI=sp.y*W2+sp.x;
+  const ok=(x,y)=>{
+    if(!passable(x,y) || inLoc.map[y][x]==="g" || inLoc.map[y][x]==="x") return false;
+    if(solid && !(x===sp.x&&y===sp.y)){
+      const o=npcAt(x,y);
+      if(o && o!==n) return false;
+      if(x===P.x && y===P.y) return false;
+    }
+    return true;
+  };
+  const q=[startI]; prev[startI]=startI;
+  let qi=0, found=false;
+  while(qi<q.length){
+    const i=q[qi++];
+    if(i===goalI){ found=true; break; }
+    const x=i%W2, y=(i/W2)|0;
+    for(const[dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){
+      const nx=x+dx, ny=y+dy;
+      if(nx<0||ny<0||nx>=W2||ny>=H2) continue;
+      const j=ny*W2+nx;
+      if(prev[j]!==-1 || !ok(nx,ny)) continue;
+      prev[j]=i; q.push(j);
+    }
+  }
+  if(!found) return null;
+  let cur=goalI;
+  while(prev[cur]!==startI) cur=prev[cur];
+  return {x:cur%W2, y:(cur/W2)|0};
+}
 function phaseSpot(n){
   const ph=dayPhase();
   if(ph==="social" && n.s) return {x:n.s[0],y:n.s[1]};
@@ -2623,20 +2664,13 @@ function tick(){
   if(P.relics.regen && turns%3===0 && P.hp<P.maxhp) P.hp++;
   if(P.hp<=0){ playerDeath(); render(); return; }
   monsterTurn();
-  // townsfolk go about their day — an amble toward wherever the hour calls them
+  // townsfolk go about their day — a true path (BFS) toward wherever the hour calls them
   if(inLoc && !inLoc.raid && turns%2===0){
     for(const n of inLoc.npcs){
       const sp=phaseSpot(n);
       if(n.x===sp.x && n.y===sp.y) continue;
-      const dx=Math.sign(sp.x-n.x), dy=Math.sign(sp.y-n.y);
-      const opts=[];
-      if(dx&&dy){ if(R()<.5) opts.push([dx,0],[0,dy]); else opts.push([0,dy],[dx,0]); }
-      else if(dx) opts.push([dx,0]); else if(dy) opts.push([0,dy]);
-      for(const[ox,oy] of opts){
-        const nx=n.x+ox, ny=n.y+oy;
-        if(passable(nx,ny) && !npcAt(nx,ny) && !(nx===P.x&&ny===P.y) && !monsterAt(nx,ny)
-           && inLoc.map[ny][nx]!=="g" && inLoc.map[ny][nx]!=="x"){ n.x=nx; n.y=ny; break; }
-      }
+      const st=npcStep(n,sp);
+      if(st && !npcAt(st.x,st.y) && !(st.x===P.x&&st.y===P.y) && !monsterAt(st.x,st.y)){ n.x=st.x; n.y=st.y; }
     }
   }
   if((mode==="play"||mode==="won") && !inDun && !inLoc) { spawnMonsters(); cullMonsters(); }
