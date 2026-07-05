@@ -2659,6 +2659,7 @@ function killMonster(m){
       virtue(2,3);
       sfx.level();
       msg("(Only VARKUL's death ends the burnings. His lair smokes in the mountains.)","m-sys");
+      townRecover();
       return;
     }
     if(inLoc.raid==="dragon"){
@@ -2755,15 +2756,43 @@ function killMonster(m){
       virtue(2,3,"Thou stoodest when others fled.");
       virtue(3,3);
       sfx.level();
+      msg("(The pirates will not forget. Their next crews will be larger.)","m-sys");
+      townRecover();
     } else {
       P.skullRespect=true; P.skullWrath=false;
       msg("The last pirate falls. Skullhaven goes quiet...","m-good");
       msg('"Any dog that bites that hard drinks free." The port is thine again.',"m-gold");
       sfx.level();
-    }
-    if(inLoc.raid!=="final")
       msg("(The pirates will not forget. Their next crews will be larger.)","m-sys");
+      townRecover();
+    }
   }
+}
+// when a town raid is won, the town comes back to life around the victor
+function townRecover(){
+  if(!inLoc || !LOCS[inLoc.key] || !Object.keys(LOCS[inLoc.key].npcs||{}).length) return;
+  inLoc.raid=null;
+  inLoc.map=inLoc.map.map(r=>r.replace(/F/g,","));   // bucket-lines douse the last fires
+  const L=LOCS[inLoc.key], npcs=[];
+  L.map.forEach((row,y)=>{ row.split("").forEach((ch,x)=>{
+    if(L.npcs[ch]){
+      const def=L.npcs[ch];
+      if(!(inLoc.key==="town2" && P.finalDone && def.name==="Pirate King Rafe"))
+        npcs.push(Object.assign({x,y,wx:x,wy:y},def));
+    }
+  });});
+  for(const n of npcs){
+    const sp=phaseSpot(n);
+    if(!(sp.x===n.x&&sp.y===n.y) && !npcs.some(o=>o!==n&&o.x===sp.x&&o.y===sp.y)
+       && !(sp.x===P.x&&sp.y===P.y)){ n.x=sp.x; n.y=sp.y; }
+    if(n.x===P.x&&n.y===P.y){  // never materialize under the hero's boots
+      for(const[dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]])
+        if(passable(n.x+dx,n.y+dy)&&!npcs.some(o=>o.x===n.x+dx&&o.y===n.y+dy)){ n.x+=dx; n.y+=dy; break; }
+    }
+  }
+  inLoc.npcs=npcs;
+  msg("Doors creak open — the townsfolk emerge from hiding.","m-blue");
+  updateTune(); render();
 }
 function monPass(m,x,y){
   const t=tileAt(x,y);
