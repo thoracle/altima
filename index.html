@@ -1071,6 +1071,7 @@ stonevale:{
      greet:"A soot-eyed miner stares at nothing in particular.",
      lines:{ job:"I dig. I dug too deep once. Once.",
        deep:"Below the third floor the air goes WRONG. Wraiths. Basilisks. On the fifth... things with horns.",
+       warden:"Third floor of every pit there's a VAULT, and in the vault a warden. The only ladder down is in its lap. I turned back. Thou wilt not.",
        relic:"The old-magic trinkets? Bottom floors. Every pit has one. Guarded, always guarded.",
        dungeon:"Gloom, Vex, Maw, Hollow — and the isle-pits, Gilt and Wrack. Five floors each now. FIVE.",
        varkul:"Heard the dragon's dead. Good. His lair had the only gold I never wanted." }},
@@ -1409,6 +1410,26 @@ const UNDEAD_SPR={skeleton:1,ghost:1,lich:1,wraith:1};
 // 6b. Dungeons — rogue-style rooms & corridors, same top-down view
 //---------------------------------------------------------------
 const DW=40, DH=40, DLEV=5;
+// wardens of the third floor: each pit's descent runs through a scripted vault
+const DUN_BOSSES=[
+  {base:"wraith",   name:"the Warden of Gloom", hp:48, dmg:10},
+  {base:"ghost",    name:"the Vex Whisperer",   hp:44, dmg:11},
+  {base:"snake",    name:"the Maw-Mother",      hp:56, dmg:11},
+  {base:"skeleton", name:"the Hollow King",     hp:52, dmg:12},
+  {base:"troll",    name:"the Gilded Troll",    hp:64, dmg:13},
+  {base:"wraith",   name:"the Drowned Abbot",   hp:60, dmg:13},
+];
+const VAULT=[
+  "wwwwwwwwwww",
+  "w.........w",
+  "w.m.....m.w",
+  "w....B....w",
+  "w....L....w",
+  "w.m.....m.w",
+  "w...$.$...w",
+  "w.........w",
+  "wwwwwwwwwww",
+];
 function genDunLevel(di,lvl){
   const rr=mulberry32((WORLD_SEED*31 + di*7919 + lvl*104729)|0);
   const ri2=(a,b)=>a+Math.floor(rr()*(b-a+1));
@@ -1454,6 +1475,43 @@ function genDunLevel(di,lvl){
     mobs.push({key,name:def.name,spr:def.spr,x,y,hp:def.hp+lvl*4,dmg:def.dmg+lvl*2,
                ac:def.ac,xp:def.xp+lvl*8,gold:[def.gold[0]+lvl*4,def.gold[1]+lvl*8],
                water:false,poison:def.poison,ranged:def.ranged});
+  }
+  // third floor: the warden's vault swallows the down ladder
+  if(lvl===2 && down){
+    const slain=(typeof P!=="undefined" && P && P.dunBossSlain)||{};
+    const ox=Math.max(1,Math.min(DW-VAULT[0].length-1, down.x-5));
+    const oy=Math.max(1,Math.min(DH-VAULT.length-1,   down.y-4));
+    let bx=0,by=0; const minions=[], vChests=[];
+    for(let vy=0;vy<VAULT.length;vy++)for(let vx=0;vx<VAULT[0].length;vx++){
+      const ch=VAULT[vy][vx], X=ox+vx, Y=oy+vy;
+      g[Y*DW+X] = ch==="w"? T.DWALL : ch==="L"? T.LADDD : T.DFLOOR;
+      if(ch==="B"){ bx=X; by=Y; }
+      else if(ch==="m") minions.push({x:X,y:Y});
+      else if(ch==="$") vChests.push({x:X,y:Y});
+      else if(ch==="L"){ down.x=X; down.y=Y; }
+    }
+    // carve a way in: door at the top wall, then an L-tunnel to the up ladder
+    let cx3=ox+5, cy3=oy;
+    g[cy3*DW+cx3]=T.DFLOOR;
+    let x3=cx3, y3=Math.max(1,cy3-1);
+    while(y3!==up.y){ if(g[y3*DW+x3]===T.DWALL) g[y3*DW+x3]=T.DFLOOR; y3+=Math.sign(up.y-y3); }
+    while(x3!==up.x){ if(g[y3*DW+x3]===T.DWALL) g[y3*DW+x3]=T.DFLOOR; x3+=Math.sign(up.x-x3); }
+    // the vault belongs to the warden, not to wandering vermin
+    for(let k=mobs.length-1;k>=0;k--)
+      if(mobs[k].x>=ox&&mobs[k].x<ox+11&&mobs[k].y>=oy&&mobs[k].y<oy+9) mobs.splice(k,1);
+    if(!slain[di]){
+      const B=DUN_BOSSES[di]||DUN_BOSSES[0], bd=MONST[B.base];
+      mobs.push({key:B.base,name:B.name,proper:true,spr:bd.spr,x:bx,y:by,hp:B.hp,dmg:B.dmg,ac:4,
+                 xp:150+di*25,gold:[60+di*10,130+di*20],water:false,poison:bd.poison,ranged:bd.ranged,
+                 bossDi:di});
+      for(const mn of minions){
+        const key=tbl[Math.floor(rr()*tbl.length)], def=MONST[key];
+        mobs.push({key,name:def.name,spr:def.spr,x:mn.x,y:mn.y,hp:def.hp+8,dmg:def.dmg+4,
+                   ac:def.ac,xp:def.xp+16,gold:[def.gold[0]+8,def.gold[1]+16],
+                   water:false,poison:def.poison,ranged:def.ranged});
+      }
+      for(const c of vChests) lvChests.push({x:c.x,y:c.y,gold:80+di*20});
+    }
   }
   return {grid:g, mobs, chests:lvChests, up, down, heart:{x:last.cx,y:last.cy}};
 }
@@ -1552,7 +1610,7 @@ function newGame(){
       lastAmbush:0, lastGhost:0, risen:false, risenDone:false,
       plot:null, plotDone:false, trialDone:false, trialHinted:false, trialNagged:false,
       runes:[false,false,false,false,false,false,false,false], bow:false, horse:false, horseStep:false,
-      relics:{}, relicsFound:{}, lastTitle:"the Stranger" };
+      relics:{}, relicsFound:{}, lastTitle:"the Stranger", dunBossSlain:{} };
   ghostShip=null;
   SEEN=new Uint8Array(W*H);
   // ensure start tile walkable
@@ -2348,6 +2406,13 @@ function killMonster(m){
   }
   else if(g>0 && m.water){ P.gold+=g; msg(`Thou fishest ${g} gold from the wreckage.`,"m-gold"); }
   else if(g>0) chests.push({x:m.x,y:m.y,gold:g});
+  if(m.bossDi!==undefined && !(P.dunBossSlain&&P.dunBossSlain[m.bossDi])){
+    P.dunBossSlain=P.dunBossSlain||{};
+    P.dunBossSlain[m.bossDi]=true;
+    sfx.level();
+    msg(`The vault falls silent. ${m.name.replace(/^the /,"The ")} guards the depths no more.`,"m-gold");
+    virtue(2,4,"A warden of the dark overthrown.");
+  }
   if(m.name==="the Barrow King" && !P.silverKey && !P.barrowOpened){
     P.silverKey=true;
     msg("Among the Barrow King's dust gleams a SILVER KEY!","m-gold");
@@ -3159,6 +3224,9 @@ function load(){
       ? Object.fromEntries(Object.keys(RELICS).filter(k=>o[k]).map(k=>[k,true])) : {};
     P.relics=cleanRelics(P.relics); P.relicsFound=cleanRelics(P.relicsFound);
     if(typeof P.lastTitle!=="string" || P.lastTitle.length>40) P.lastTitle="the Stranger";
+    { const src=(P.dunBossSlain&&typeof P.dunBossSlain==="object")?P.dunBossSlain:{};
+      P.dunBossSlain={};
+      for(let i=0;i<6;i++) if(src[i]===true) P.dunBossSlain[i]=true; }
     if(P.siege && !(Number.isInteger(P.siege.town)&&P.siege.town>=0&&P.siege.town<=4)) P.siege=null;
     if(P.moonCurse && !(Number.isInteger(P.moonCurse.gate)&&GATES[P.moonCurse.gate])) P.moonCurse=null;
     if(P.desec && !(Number.isInteger(P.desec.v)&&P.desec.v>=0&&P.desec.v<8)) P.desec=null;

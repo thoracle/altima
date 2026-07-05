@@ -41,7 +41,9 @@ thy progress.
   as clickable reply chips (numbers and free typing still work) —
   secrets still hide behind unlisted words, and the folk greet a
   Paragon differently than a Stranger
-- Roguelike bump combat everywhere: overworld, 5-level dungeons, and a
+- Roguelike bump combat everywhere: overworld, 5-level dungeons (each
+  with a scripted vault on the third floor, where a named warden and
+  its retinue guard the only ladder down), and a
   dozen raid scenarios (pirate sieges, undead moongate incursions, shrine
   desecrations, a dragon that burns towns, a deck fight for a ghost ship,
   a whodunit in the castle court, and more)
