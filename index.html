@@ -2592,15 +2592,38 @@ function hullHit(dmg,src){
   msg(`The ${src} rends thy hull for ${dmg}!${s.ghost?" (the spectral timbers shrug)":""}`,"m-bad");
   if(s.hull<=0) shipwreck();
 }
+let MAINLAND=null;   // every land tile connected to Castle Lumen, computed on first need
+function landmassOk(x,y){
+  if(!MAINLAND){
+    MAINLAND=new Set([CASTLE.x+","+CASTLE.y]);
+    const q=[[CASTLE.x,CASTLE.y]];
+    while(q.length){
+      const[cx,cy]=q.pop();
+      for(const[dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){
+        const nx=cx+dx, ny=cy+dy, k=nx+","+ny;
+        if(!MAINLAND.has(k) && WALK_LAND.has(gw(nx,ny))){ MAINLAND.add(k); q.push([nx,ny]); }
+      }
+    }
+  }
+  return MAINLAND.has(x+","+y);
+}
 function shipwreck(){
   msg("Thy ship founders and slips beneath the waves!","m-bad");
   ships.splice(P.shipIdx,1);
   P.onShip=false; P.shipIdx=-1;
-  // wash ashore at the nearest land tile
+  // the currents carry thee to a proper shore — never a castaway islet
+  let landed=false;
   outer:
-  for(let r=1;r<30;r++)for(let oy=-r;oy<=r;oy++)for(let ox=-r;ox<=r;ox++){
-    if(WALK_LAND.has(gw(P.x+ox,P.y+oy))){ P.x+=ox; P.y+=oy; break outer; }
+  for(let r=1;r<60;r++)for(let oy=-r;oy<=r;oy++)for(let ox=-r;ox<=r;ox++){
+    if(WALK_LAND.has(gw(P.x+ox,P.y+oy)) && landmassOk(P.x+ox,P.y+oy)){
+      P.x+=ox; P.y+=oy; landed=true; break outer;
+    }
   }
+  if(!landed)
+    outer2:
+    for(let r=1;r<60;r++)for(let oy=-r;oy<=r;oy++)for(let ox=-r;ox<=r;ox++){
+      if(WALK_LAND.has(gw(P.x+ox,P.y+oy))){ P.x+=ox; P.y+=oy; break outer2; }
+    }
   const d=ri(8,20);
   P.hp-=d;
   msg(`Half-drowned, thou washest ashore (${d} damage).`,"m-bad");
