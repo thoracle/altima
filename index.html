@@ -640,6 +640,26 @@ function padMap(rows){
   const w=Math.max(...rows.map(r=>r.length));
   return rows.map(r=>r.padEnd(w,"g"));
 }
+// every tavern keeps a bed: full heal, poison cured, sleep till dawn, meals included
+function innRest(cost){
+  return ()=>{
+    if(P.gold<cost) return msg('"No coin, no bed, friend."',"m-sys");
+    P.gold-=cost; P.hp=P.maxhp; P.poison=false;
+    turns=Math.ceil((turns+1)/400)*400;
+    sfx.virtue(); renderStats();
+    msg("Thou sleepest deep and wakest at dawn, whole and well fed.","m-good");
+  };
+}
+function mkInn(name,greet,cost,gossip){
+  return {name, spr:"merchant", peace:true, always:1, greet,
+    lines:{
+      job:`Beds and board for the road-weary! Say ROOM — ${cost} gold buys rest till dawn, meals included.`,
+      room:{ask:`"A warm bed till first light — ${cost} gold. Take it?" (Y/N)`,
+        yes:innRest(cost),
+        no:()=>msg('"Suit thyself. The road is cold."',"m-say")},
+      gossip,
+    }};
+}
 const LOCS = {
 castle:{
   name:"Castle Lumen",
@@ -741,7 +761,7 @@ town0:{
   "gg####,,,,,,,####gg",
   "g,,,,,,,,,,,,,,,,,g",
   "g#D####,#D##,#D##,g",
-  "g#....#,#B.#,#B.#,g",
+  "g#..6.#,#B.#,#B.#,g",
   "g#..C.#,####,####,g",
   "g######,,,,,,,,,,,g",
   "ggggggggggggggggggg",
@@ -787,6 +807,8 @@ town0:{
        pray:"Spirituality binds the other seven. Its mantra is OM.",
        mantra:"OM. Breathe it at the shrine of Spirituality.",
        shrine:"The shrines are marked as white steps upon thy map." }},
+   "6":mkInn("Innkeeper Wren","A round innkeeper polishes a mug that needs no polishing.",10,
+     "The pits' wardens guard the only ladders down, they say. Sleep FIRST, fight after — that's my advice, and it's free."),
   }},
 town1:{
   name:"Ironfast",
@@ -804,7 +826,7 @@ town1:{
   "gg,,,,,,,@,,,,,,,gg",
   "g,,,,,,,,,,,,,,,,,g",
   "g#D####,#D##,#D##,g",
-  "g#....#,#B.#,#B.#,g",
+  "g#..6.#,#B.#,#B.#,g",
   "g#..C.#,####,####,g",
   "g######,,,,,,,,,,,g",
   "ggggggggggggggggggg",
@@ -853,6 +875,8 @@ town1:{
        pirate:"Pirate sails prowl the deep. Sink one gently and her crew will strike colors — then she is thine.",
        dungeon:"Treasure sleeps at the bottom of the dungeons. So do trolls. Plan accordingly.",
        treasure:"The deepest vaults of the dungeons hold gold — and honor for those who reach them." }},
+   "6":mkInn("Innkeeper Brand","A one-armed innkeeper stokes the fire with practiced ease.",10,
+     "A horse from Grimm and a night in my beds — that's how the smart ones cross Albion."),
   }},
 town2:{
   name:"Skullhaven",
@@ -882,6 +906,9 @@ town2:{
      greet:"A wild-haired tavern keeper slams a mug on the counter.",
      lines:{ job:"Rum and salt pork for them what pays! Say BUY.",
        buy:{shop:"food"},
+       room:{ask:'"A hammock and a lock on the door — 15 gold, harbor rates. Take it?" (Y/N)',
+         yes:innRest(15),
+         no :()=>msg('"Then drink standing, love."',"m-say")},
        rum:"Rum's off. Drank it meself.",
        pirate:"Everyone here's a pirate, love. Even the rats." }},
    "2":{name:"One-Eyed Silas",spr:"pirate",peace:true,
@@ -937,7 +964,7 @@ willowdale:{
   "g,t,,####,,t,,,,,,g",
   "g,,,,,,,,,,,,,,,,,g",
   "g#D####,#D##,#D##,g",
-  "g#....#,#B.#,#B.#,g",
+  "g#..6.#,#B.#,#B.#,g",
   "g#..C.#,####,####,g",
   "g######,,,,,,,,,,,g",
   "ggggggggggggggggggg",
@@ -974,6 +1001,8 @@ willowdale:{
      lines:{ job:"I ward Willowdale! Mostly from wolves. Sometimes from geese.",
        swamp:"Mind the marshes east — vipers, and worse. Basilisks come up from the deep dungeons now.",
        monster:"Wraiths and demons in the dungeon depths, the miners say. I stay up here. With the geese." }},
+   "6":mkInn("Goodwife Fern","A brisk goodwife shakes out a blanket that smells of lavender.",10,
+     "The hermit talks to the pond. Folk laugh. But the pond, they say, talks back."),
   }},
 goldport:{
   name:"Goldport",
@@ -993,7 +1022,7 @@ goldport:{
   "g,####,####,,,,,,,g",
   "g,,,,,,,,,,,,,,,,,g",
   "g#D####,#D##,#D##,g",
-  "g#....#,#B.#,#B.#,g",
+  "g#..6.#,#B.#,#B.#,g",
   "g#..C.#,####,####,g",
   "g######,,,,,,,,,,,g",
   "ggggggggggggggggggg",
@@ -1031,6 +1060,8 @@ goldport:{
      lines:{ job:"I knit. I watch. I remember.",
        rumor:"The moons have been strange lately. When the red door opens, child, don't walk in unarmed.",
        honesty:"Kept an honest ledger forty years. The rune of it sits under the bard's feet in Moonhaven, they say." }},
+   "6":mkInn("Innkeeper Sorrel","A weathered innkeeper counts mugs like a dockmaster counts hulls.",10,
+     "A drowned captain keeps the finest sextant ever made. Divers talk. Drunk divers talk more."),
   }},
 stonevale:{
   name:"Stonevale",
@@ -1050,7 +1081,7 @@ stonevale:{
   "gwwwwwww,wwwwwwwg",
   "g,,,,,,,,,,,,,,,g",
   "g#D####,#D##,,,,g",
-  "g#....#,#B.#,,,,g",
+  "g#..6.#,#B.#,,,,g",
   "g#..C.#,####,,,,g",
   "g######,,,,,,,,,g",
   "ggggggggggggggggg",
@@ -1088,6 +1119,8 @@ stonevale:{
          const amt=Math.min(P.gold,ri(2,5)); P.gold-=amt;
          if(P.marnT===undefined || turns-P.marnT>=100){ P.marnT=turns; virtue(1,3,`Widow Marn accepts ${amt} gold with quiet grace.`); }
          else msg(`Widow Marn thanks thee for ${amt} gold.`,"m-say"); } }},
+   "6":mkInn("Innkeeper Ash","An innkeeper with quarry dust in his beard sets out a candle.",10,
+     "Miners sleep here when the deep spooks them. Lately? Full house, every night."),
   }},
 cellar:{
   name:"Marla's Cellar",
@@ -3206,16 +3239,7 @@ function cmdCamp(){
   if(inLoc){
     if(inLoc.raid) return msg("No rest while foes prowl the streets!","m-bad");
     if(!TOWN_KEYS.includes(inLoc.key)) return msg("No inn keeps beds here.","m-sys");
-    const cost = inLoc.key==="town2" ? 15 : 10;   // Skullhaven charges harbor rates
-    if(P.gold<cost) return msg(`The innkeeper wants ${cost} gold for a bed. Thou hast not the coin.`,"m-sys");
-    askYesNo(`A warm bed at the tavern — ${cost} gold buys rest till dawn, meals included. Take it? (Y/N)`,
-      ()=>{ P.gold-=cost;
-        P.hp=P.maxhp; P.poison=false;
-        turns=Math.ceil((turns+1)/400)*400;   // sleep to first light
-        sfx.virtue();
-        msg("Thou sleepest deep and wakest at dawn, whole and well fed.","m-good");
-        renderStats(); render(); },
-      ()=>msg('"Suit thyself. The road is cold."',"m-say"));
+    msg("Seek the innkeeper at the tavern — they will see thee bedded till dawn.","m-sys");
     return;
   }
   if(P.onShip) return msg("Thou canst not camp upon the waves.","m-sys");
@@ -3398,7 +3422,7 @@ document.addEventListener("keydown",e=>{
          T — talk (then direction) · F — attack, or cannons at sea<br>
          E — enter town/castle/dungeon, climb ladders<br>
          M — meditate at shrine · G — get chest · P — peer at map<br>
-         B — board or cross to adjacent ship · X — go ashore · H — camp / inn in town<br>
+         B — board or cross to adjacent ship · X — go ashore · H — camp (innkeepers rent beds in town)<br>
          Z — ztats · Shift+S — save · Space — pass<br><br>
          Raise all eight virtues to 80 to become the Saint.<br>
          Shrines sleep until their hidden RUNE is found — ask the folk.<br>
