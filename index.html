@@ -209,6 +209,8 @@ kraken:{px:["........","..t..t..",".t.tt.t.","..tttt..",".ttEEtt.","..tttt..",".
         pal:{".":null,"t":"#7a3aa0","E":"#ff4a4a"}},
 whirl :{px:["..www...",".w...w..","w..ww.w.","w.w..w.w","w.w.ww.w",".w....w.","..wwww..","........"],
         pal:{".":null,"w":"#7fd9ff"}},
+rider :{px:["...hh...","..bbb...",".mmmmmmM",".mmmmmm.",".m.mm.m.",".m.mm.m.","........","........"],
+        pal:{".":null,"h":"#f2c896","b":"#6fa8ff","m":"#7a4e22","M":"#9a6e3a"}},
 cave  :{px:["........","..aaaa..",".aaaaaa.","aaa00aaa","aa0000aa","aa0000aa","aaaaaaaa","........"],
         pal:{".":"#2e9a2e","a":"#8a8a8a","0":"#0a0a0a"}},
 dwall :{px:["bbbbbbbb","b...b...","bbbbbbbb","..b...b.","bbbbbbbb","b...b...","bbbbbbbb","..b...b."],
@@ -501,7 +503,7 @@ castle:{
   "g#.................#g",
   "g#..3.........4....#g",
   "g#.................#g",
-  "g#.....5...........#g",
+  "g#.....5.......6...#g",
   "g#########D#########g",
   "gggggggggg@gggggggggg",
   "ggggggggggggggggggggg",
@@ -549,6 +551,21 @@ castle:{
          ? '"Last midnight I saw two shadows by the vault... and heard KEYS. Look for stolen vault keys at their belts!"'
          : '"Traitors? In OUR castle? ...I did once hear rats in the vault, though."',"m-say"),
        mantra:"I heard the mantra of Sacrifice is DON!" }},
+   "6":{name:"the Seer of Souls",spr:"mage",peace:true,
+     greet:"A blind seer turns toward thee before thou hast spoken.",
+     lines:{
+      job:"I see nothing — and everything. Ask of thy SOUL, or name any virtue.",
+      soul:()=>{
+        const worst=P.virtues.indexOf(Math.min(...P.virtues));
+        const best=P.virtues.indexOf(Math.max(...P.virtues));
+        if(best===worst) msg('"Thy soul is a level field — no virtue leads, none lags. All await thy deeds."',"m-blue");
+        else msg(`"${VIRTUES[best]} burns brightest in thee. But ${VIRTUES[worst]} sleeps — tend it, lest it wake thee at night."`,"m-blue");
+      },
+      rune:"Each shrine sleeps until its rune wakes it. The runes lie hidden where their virtues LIVE — ask those who embody them.",
+      saint:()=>msg(P.avatar? '"Thou art the Saint. Even the blind see that."'
+        : P.trialDone? '"The Trial is behind thee. Only fullness of virtue remains."'
+        : '"The path is deeds, shrines, and at the last, thy own shadows."',"m-blue"),
+     }},
   }},
 town0:{
   name:"Moonhaven",
@@ -631,7 +648,13 @@ town1:{
   npcs:{
    "1":{name:"Grimm the Smith",spr:"merchant",peace:true,
      greet:"The forge roars. A soot-black smith looks up.",
-     lines:{ job:"Steel for coin! Say BUY for weapons.",
+     lines:{ job:"Steel for coin! Say BUY for weapons. I shoe HORSEs too — 120 gold buys a good one.",
+       horse:()=>{
+         if(P.horse) return msg('"Thy mare waits outside, well shod."',"m-sys");
+         if(P.gold<120) return msg('"A horse is 120 gold. Come back heavier."',"m-sys");
+         P.gold-=120; P.horse=true; sfx.gold();
+         msg("A sturdy mare is thine! Overland travel now takes half the time.","m-gold");
+       },
        buy:{shop:"weapons"} }},
    "2":{name:"Sage Wystan",spr:"mage",peace:true,
      greet:"An ancient sage peers over a mountain of scrolls.",
@@ -857,6 +880,26 @@ void:{
 // map town index to LOC key
 const TOWN_KEYS=["town0","town1","town2"];
 
+// the Seer reads each virtue by name
+{
+  const tier=v=> v>=100?"is PERFECTED in thee":v>=80?"burns bright — sainthood's measure"
+    :v>=65?"grows strong":v>=45?"wakes within thee":v>=25?"stirs, but faintly":"strays in darkness";
+  VIRTUES.forEach((vn,i)=>{
+    LOCS.castle.npcs["6"].lines[vn.toLowerCase()]=()=>msg(`"Thy ${vn} ${tier(P.virtues[i])}."`,"m-blue");
+  });
+}
+// rune hints, spoken by those who embody each virtue
+LOCS.town0.npcs["3"].lines.rune="Honesty's rune? *she winks* I stand upon my secrets, right here in the square.";
+LOCS.town0.npcs["2"].lines.rune="Compassion's rune... I sleep atop something hard in my corner. Cold nights, warm secret.";
+LOCS.town1.npcs["1"].lines.rune="Valor's rune? Quenched it into my forge corner myself. Take it, if thou darest the heat.";
+LOCS.castle.npcs["3"].lines.rune="The Rune of Justice lies at the foot of the throne — where judgment is passed.";
+LOCS.town0.npcs["1"].lines.rune="Sacrifice's rune rests here in my infirmary, by the west wall, where the blood is given.";
+LOCS.town1.npcs["2"].lines.rune="Honor's rune sleeps amid the hoard in Gloom's deepest vault. Honor is earned in the dark.";
+LOCS.town2.npcs["1"].lines.rune="A holy rock? Aye, under my corner table. Keeps the roof from leakin'. Touch it and buy somethin'.";
+LOCS.town1.npcs["3"].lines.rune={ask:"\"The rune of Humility for a straight answer! Art thou worthy of it?\" (Y/N)",
+  yes:()=>virtue(7,-3,"\"WORTHY? HA! Then swim for it blind!\" Fenn tells thee nothing."),
+  no :()=>msg('"Honest! It never left its island shrine — search the sands beside it. None proud enough to sail there ever knelt."',"m-say")};
+
 //---------------------------------------------------------------
 // 5. Shops
 //---------------------------------------------------------------
@@ -885,12 +928,17 @@ const SHOPS={
   armor:{title:"ARMORY", items: ARMORS.slice(1,5).map((a,i)=>(
     {name:`${a.name} (+${a.def} def)`, cost:a.cost, buy:()=>{P.armor=Math.max(P.armor,i+1); }}))},
   fence:{title:"ACQUIRED GOODS", items:[
+    {name:"Bow (2-10 dmg, range 4)", cost:100,
+     buy:()=>{ if(P.bow){ P.gold+=100; msg('"Thou hast a bow already, friend."',"m-sys"); }
+               else { P.bow=true; virtue(0,-2,"Its last owner won't miss it."); } }},
     {name:"Sword (3-16 dmg)",   cost:100, buy:()=>{P.weapon=Math.max(P.weapon,3); virtue(0,-2,"Stolen steel, cheap and quiet.");}},
     {name:"Halberd (5-24 dmg)", cost:250, buy:()=>{P.weapon=Math.max(P.weapon,4); virtue(0,-2,"No questions asked.");}},
     {name:"Chain mail (+4 def)",cost:150, buy:()=>{P.armor=Math.max(P.armor,3);  virtue(0,-2,"Still smells of its last owner.");}},
     {name:"Plate mail (+6 def)",cost:330, buy:()=>{P.armor=Math.max(P.armor,4);  virtue(0,-2,"A bargain soaked in blood.");}},
   ]},
 };
+SHOPS.weapons.items.push({name:"Bow (2-10 dmg, range 4)", cost:150,
+  buy:()=>{ if(P.bow){ P.gold+=150; msg('"Thou hast a fine bow already!"',"m-sys"); } else P.bow=true; }});
 
 //---------------------------------------------------------------
 // 6. Monsters
@@ -969,7 +1017,33 @@ function genDunLevel(di,lvl){
                ac:def.ac,xp:def.xp+lvl*8,gold:[def.gold[0]+lvl*4,def.gold[1]+lvl*8],
                water:false,poison:def.poison});
   }
-  return {grid:g, mobs, chests:lvChests, up, down};
+  return {grid:g, mobs, chests:lvChests, up, down, heart:{x:last.cx,y:last.cy}};
+}
+const GLOOM_HEART = genDunLevel(0,2).heart;   // where the Rune of Honor sleeps
+
+//---------------------------------------------------------------
+// 6c. The Eight Runes — hidden where their virtues live
+//---------------------------------------------------------------
+const RUNESPOTS=[
+  {v:0, loc:"town0",  x:8,  y:6},   // Honesty — beneath the bard's stage
+  {v:1, loc:"town0",  x:13, y:4},   // Compassion — Old Tam's cold corner
+  {v:2, loc:"town1",  x:2,  y:2},   // Valor — quenched in the forge corner
+  {v:3, loc:"castle", x:3,  y:5},   // Justice — at the foot of the throne
+  {v:4, loc:"town0",  x:3,  y:4},   // Sacrifice — Ana's infirmary wall
+  {v:5, loc:"gloom3"},              // Honor — the heart of Gloom's hoard
+  {v:6, loc:"town2",  x:2,  y:4},   // Spirituality — under Meg's corner table
+  {v:7, loc:"humisle"},             // Humility — the sands beside its shrine
+];
+function runeHere(){
+  for(const r of RUNESPOTS){
+    if(P.runes[r.v]) continue;
+    if(r.loc==="gloom3"){
+      if(inDun && inDun.idx===0 && inDun.lvl===2 && P.x===GLOOM_HEART.x && P.y===GLOOM_HEART.y) return r.v;
+    } else if(r.loc==="humisle"){
+      if(!inLoc && !inDun && P.x===SHRINES[7].x && P.y===SHRINES[7].y+1) return r.v;
+    } else if(inLoc && !inLoc.raid && inLoc.key===r.loc && P.x===r.x && P.y===r.y) return r.v;
+  }
+  return -1;
 }
 
 //---------------------------------------------------------------
@@ -1034,7 +1108,8 @@ function newGame(){
       undeadWar:0, moonCurse:null, lastCurse:0, silverKey:false, barrowOpened:false,
       ratsDone:false, desec:null, lastDesec:0, cultWar:0, dragonAwake:false, dragonSlain:false,
       lastAmbush:0, lastGhost:0, risen:false, risenDone:false,
-      plot:null, plotDone:false, trialDone:false, trialHinted:false, trialNagged:false };
+      plot:null, plotDone:false, trialDone:false, trialHinted:false, trialNagged:false,
+      runes:[false,false,false,false,false,false,false,false], bow:false, horse:false, horseStep:false };
   ghostShip=null;
   // ensure start tile walkable
   if(!WALK_LAND.has(gw(P.x,P.y))){ sw(P.x,P.y,T.GRASS); }
@@ -1182,7 +1257,8 @@ function render(){
       for(const m of monsters) draw(m.spr,m.x,m.y);
     }
   }
-  draw(P.onShip&&!inLoc ? (curShip()&&curShip().ghost?"gships":"ship") : "player", px, py);
+  draw(P.onShip&&!inLoc ? (curShip()&&curShip().ghost?"gships":"ship")
+     : (P.horse&&!inLoc&&!inDun) ? "rider" : "player", px, py);
   // darkness: dungeons always, world at night
   if(inDun || (!inLoc && isNight())){
     const cxp=(HALF+.5)*TILE, cyp=(HALF+.5)*TILE;
@@ -1219,8 +1295,10 @@ function renderStats(){
   html+=`<div class="srow"><span>Exp</span><b>${P.xp}</b></div>`;
   html+=`<div class="srow"><span>Gold</span><b style="color:var(--accent)">${P.gold}</b></div>`;
   html+=`<div class="srow"><span>Food</span><b>${P.food}</b></div>`;
-  html+=`<div class="srow"><span>Weapon</span><b>${w.name}</b></div>`;
+  html+=`<div class="srow"><span>Weapon</span><b>${w.name}${P.bow?" ·Bow":""}</b></div>`;
   html+=`<div class="srow"><span>Armor</span><b>${a.name}</b></div>`;
+  if(P.horse) html+=`<div class="srow"><span>Mount</span><b>Horse</b></div>`;
+  html+=`<div class="srow"><span>Runes</span><b>${P.runes.filter(Boolean).length}/8</b></div>`;
   if(P.silverKey) html+=`<div class="srow"><span>Key</span><b style="color:#cfd8e8">Silver</b></div>`;
   html+=`<div class="srow"><span>Moons</span><b>${moons[phase%3]} gate ${phase+1}</b></div>`;
   html+=`<div class="srow"><span>Time</span><b>${inDun?"dark":"" || (isNight()?"night":"day")} · t${turns}</b></div>`;
@@ -1324,6 +1402,10 @@ function tryMove(dx,dy){
   }
   if((!inLoc||inLoc.raid) && chests.some(c=>c.x===nx&&c.y===ny))
     msg("A chest lies here — press G to open it.","m-gold");
+  // a horse covers ground in half the time (never with foes about)
+  if(P.horse && !inLoc && !inDun && !P.onShip
+     && !monsters.some(mm=>Math.abs(mm.x-P.x)<8&&Math.abs(mm.y-P.y)<8)
+     && (P.horseStep=!P.horseStep)){ render(); return; }
   tick();
 }
 function townName(x,y){
@@ -2316,13 +2398,49 @@ function cmdAttack(dx,dy){
     if(!inLoc.raid){ msg("Thou swingest at air.","m-sys"); return; }
   }
   const m=monsterAt(P.x+dx,P.y+dy);
-  if(!m){ msg("Thou swingest at air.","m-sys"); tick(); return; }
+  if(!m){
+    if(P.bow){ shootArrow(dx,dy); return; }
+    msg("Thou swingest at air.","m-sys"); tick(); return;
+  }
   attackMonster(m); tick();
+}
+function shootArrow(dx,dy){
+  sfx.miss();
+  for(let i=1;i<=4;i++){
+    const x=P.x+dx*i, y=P.y+dy*i;
+    const m=monsterAt(x,y);
+    if(m){
+      const hitCh=.7 + P.level*.03 - m.ac*.05;
+      if(R()<hitCh){
+        const d=ri(2,10)+Math.floor(P.level/3);
+        m.hp-=d; sfx.hit();
+        msg(`Thy arrow strikes ${mN(m)} for ${d}!`,"m-good");
+        if(m.hp<=0) killMonster(m);
+      } else msg(`Thy arrow grazes past ${mN(m)}.`,"m-sys");
+      tick(); return;
+    }
+    const t=tileAt(x,y);
+    if(!(WALK_SHIP.has(t)||t===T.GRASS||t===T.SAND||t===T.SWAMP||t===T.HILLS
+         ||t===T.FLOOR||t===T.DFLOOR||t===T.DOOR||t===T.FIRE)){
+      msg("Thy arrow shatters against stone.","m-sys"); tick(); return;
+    }
+  }
+  msg("Thy arrow flies into the distance.","m-sys");
+  tick();
 }
 
 function cmdGet(){
   const c=chests.find(c=>c.x===P.x&&c.y===P.y);
-  if(!c){ msg("Nothing here to take.","m-sys"); return; }
+  if(!c){
+    const rv=runeHere();
+    if(rv>=0){
+      P.runes[rv]=true;
+      msg(`Thou searchest... and findest the RUNE OF ${VIRTUES[rv].toUpperCase()}!`,"m-gold");
+      msg(`(${P.runes.filter(Boolean).length}/8 runes. Its shrine will answer thee now.)`,"m-sys");
+      sfx.virtue(); renderStats(); tick(); return;
+    }
+    msg("Nothing here to take.","m-sys"); return;
+  }
   chests=chests.filter(x=>x!==c);
   if(R()<.15) poisonPlayer("A poison needle pricks thee!");
   P.gold+=c.gold; sfx.gold();
@@ -2342,6 +2460,11 @@ function cmdMeditate(){
   const i=shrineIndex(P.x,P.y);
   if(P.desec && P.desec.v===i)
     return msg("The shrine is DEFILED — no prayer can pass. Confront the cult with E.","m-bad");
+  if(!P.runes[i]){
+    msg(`The shrine sleeps. Without the RUNE OF ${VIRTUES[i].toUpperCase()}, no mantra will wake it.`,"m-bad");
+    msg("(The runes lie hidden where their virtues live. Ask the folk about RUNE.)","m-sys");
+    return;
+  }
   const cdKey="s"+i;
   msg(`Thou kneelest at the Shrine of ${VIRTUES[i]}...`,"m-blue");
   openPrompt("Mantra:",(t)=>{
@@ -2463,6 +2586,9 @@ function load(){
     P.virtues=(Array.isArray(P.virtues)&&P.virtues.length===8)
       ? P.virtues.map(v=>sNum(v,25,0,100)) : [25,25,25,25,25,25,25,25];
     if(typeof P.shrineCd!=="object"||!P.shrineCd) P.shrineCd={};
+    P.runes=(Array.isArray(P.runes)&&P.runes.length===8)? P.runes.map(v=>!!v)
+      : VIRTUES.map((_,i)=>!!P.shrineCd["s"+i]);   // old saves: grant runes for shrines already proven
+    P.bow=!!P.bow; P.horse=!!P.horse; P.horseStep=false;
     if(P.siege && !(Number.isInteger(P.siege.town)&&P.siege.town>=0&&P.siege.town<=1)) P.siege=null;
     if(P.moonCurse && !(Number.isInteger(P.moonCurse.gate)&&GATES[P.moonCurse.gate])) P.moonCurse=null;
     if(P.desec && !(Number.isInteger(P.desec.v)&&P.desec.v>=0&&P.desec.v<8)) P.desec=null;
@@ -2558,8 +2684,9 @@ document.addEventListener("keydown",e=>{
          B — board or cross to adjacent ship · X — go ashore · H — camp<br>
          Z — ztats · Shift+S — save · Space — pass<br><br>
          Raise all eight virtues to 80 to become the Saint.<br>
-         Dungeons hide treasure. Sunk pirates yield their ships.<br>
-         Islands at sea hold a pirate port, rich caves — and a shrine.`,
+         Shrines sleep until their hidden RUNE is found — ask the folk.<br>
+         A bow lets F strike at range; a horse halves overland travel.<br>
+         Dungeons hide treasure. Sunk pirates yield their ships.`,
         "— PRESS ANY KEY —");
       break;
   }

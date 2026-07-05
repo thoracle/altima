@@ -19,8 +19,11 @@ Progress saves to the browser's localStorage (Shift+S to save).
 
 Master the Eight Virtues — Honesty, Compassion, Valor, Justice, Sacrifice,
 Honor, Spirituality, Humility — through deeds, shrine meditation, and the
-mantras taught by the folk of Albion. Raise all eight to 80, pass the Trial
-of the Eight, and become the **Saint**.
+mantras taught by the folk of Albion. Each shrine sleeps until its hidden
+**rune** is found (ask the folk about RUNE — they hide where their virtues
+live). Raise all eight virtues to 80, pass the Trial of the Eight, and
+become the **Saint**. The blind Seer of Souls in Castle Lumen will read
+thy progress.
 
 ## Features
 
@@ -33,6 +36,7 @@ of the Eight, and become the **Saint**.
   a whodunit in the castle court, and more)
 - Naval play: capturable pirate ships, cannon broadsides, hull damage,
   krakens, a wandering whirlpool
+- A bow for ranged attacks, and horses that halve overland travel
 - Escalating threat systems, named bosses, two legendary items, and a
   final Trial against eight shadows of yourself
 
