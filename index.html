@@ -708,6 +708,58 @@ function innDrinks(){
   const pool=(news.length && R()<.6)? news : RUMORS;   // fresh news beats old lore
   msg(`"${pool[Math.floor(R()*pool.length)]}"`,"m-blue");
 }
+// —— the arm of the law ——————————————————————————————————————
+function jailNight(loot){
+  const fine=Math.min(P.gold, Math.max(20,(loot||10)*2));
+  P.gold-=fine; P.thief=null; P.poison=false;
+  turns=Math.ceil((turns+1)/400)*400;
+  P.hp=Math.max(P.hp, Math.floor(P.maxhp*.6));
+  virtue(3,2,"The debt is paid in iron and hours.");
+  if(inLoc) leaveLoc();
+  P.x=CASTLE.x; P.y=CASTLE.y+1;
+  msg(`Thou wakest at dawn outside the castle gaol, ${fine} gold the poorer — but thy name is clean.`,"m-sys");
+  renderStats(); render();
+}
+function guardConfront(loot){
+  const g=inLoc && inLoc.npcs.find(n=>n.watch);
+  if(!g) return;   // lawless ports settle things their own way
+  for(const[dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]])
+    if(passable(P.x+dx,P.y+dy) && !npcAt(P.x+dx,P.y+dy)){ g.x=P.x+dx; g.y=P.y+dy; break; }
+  window.__talkN=g;
+  const fine=Math.max(20,loot*3), bribe=Math.ceil(fine/2);
+  msg(`${g.name} storms up, hand on hilt: "Caught red-handed! ${fine} gold, the gaol — or worse."`,"m-bad");
+  const key=inLoc.key;
+  openPrompt("Choose:",(t)=>{
+    const q=(t||"").toLowerCase();
+    hidePortrait();
+    if(q.startsWith("pay")||q==="p"){
+      if(P.gold>=fine){ P.gold-=fine; P.thief=null;
+        virtue(3,2,`Thou payest ${fine} gold. "Let that sting teach thee."`);
+      } else { msg('"Can\'t pay? The gaol, then."',"m-bad"); jailNight(loot); }
+    } else if(q.startsWith("bribe")||q==="b"){
+      if(P.gold>=bribe){ P.gold-=bribe;
+        virtue(0,-5,`${g.name} pockets ${bribe} gold and studies the clouds. "I saw nothing." The town still remembers.`);
+      } else { msg(`"Thou canst not afford my blindness." The gaol it is.`,"m-bad"); jailNight(loot); }
+    } else if(q.startsWith("submit")||q==="s"){
+      msg("Thou goest quietly.","m-sys"); jailNight(loot);
+    } else if(q.startsWith("resist")||q==="f"){
+      msg(`"So be it." ${g.name} draws steel — the WATCH answers to no thief!`,"m-bad");
+      inLoc.raid="law";
+      inLoc.npcs=inLoc.npcs.filter(n=>n!==g);
+      wMobs=wMobs||monsters; wChests=wChests||chests;
+      monsters=[{key:"watch",name:g.name,proper:true,spr:"guard",x:g.x,y:g.y,
+                 hp:70+P.level*6,dmg:14,ac:5,xp:60,gold:[0,0],water:false}];
+      chests=[];
+      updateTune(); sfx.die();
+    } else {   // RUN (and anything mumbled counts as running)
+      P.thief={town:key, until:turns+1000};
+      virtue(3,-3,"Thou boltest into the alleys. The hue and cry doubles.");
+      leaveLoc();
+    }
+    renderStats(); render();
+  },[{label:`PAY ${fine}g`,value:"pay"},{label:`BRIBE ${bribe}g`,value:"bribe"},
+     {label:"SUBMIT",value:"submit"},{label:"RUN",value:"run"},{label:"RESIST",value:"resist"}]);
+}
 // every tavern keeps a bed: full heal, poison cured, sleep till dawn, meals included
 function innRest(cost){
   return ()=>{
@@ -821,7 +873,7 @@ town0:{
   "gg#..#g,,,,,g#..#gg",
   "gg#1.D,,,,,,,D.2#gg",
   "gg####,,,,,,,####gg",
-  "gg,,,,,,ttt,,,,,,gg",
+  "gg,7,,,,ttt,,,,,,gg",
   "g@,,,,,t,,,t,,,,,gg",
   "gg,,,,,t,3,t,,,,,gg",
   "gg,,,,,t,,,t,,,,,gg",
@@ -878,6 +930,12 @@ town0:{
        pray:"Spirituality binds the other seven. Its mantra is OM.",
        mantra:"OM. Breathe it at the shrine of Spirituality.",
        shrine:"The shrines are marked as white steps upon thy map." }},
+   "7":{name:"Constable Bram",spr:"guard",peace:true,always:1,watch:1,patrol:[[2,6],[16,6],[9,14]],
+     greet:"The constable's eyes sweep the square, twice.",
+     lines:{ job:"I keep Moonhaven's peace — such as it is.",
+       thief:"Steal here and I WILL hear of it. This town talks.",
+       watch:"Nights I walk the rounds. Days too. Sleep is for the honest — which is why I get none.",
+       law:"Caught thieves pay thrice the take, or sleep in the castle gaol. Cheap either way, next to a soul." }},
    "6":mkInn("Innkeeper Wren","A round innkeeper polishes a mug that needs no polishing.",10,
      "The pits' wardens guard the only ladders down, they say. Sleep FIRST, fight after — that's my advice, and it's free."),
   }},
@@ -1182,7 +1240,7 @@ stonevale:{
   "gw,####,,####,,wg",
   "gw,#1.D,,D.2#,,wg",
   "gw,####,,####,,wg",
-  "gw,,,,,,,,,,,,,wg",
+  "gw,,,,,,,,,,7,,wg",
   "g@,,,,,,3,,,,,,wg",
   "gw,,,,,5,,,,,,,wg",
   "gw,####,,####,,wg",
@@ -1229,6 +1287,11 @@ stonevale:{
          const amt=Math.min(P.gold,ri(2,5)); P.gold-=amt;
          if(P.marnT===undefined || turns-P.marnT>=100){ P.marnT=turns; virtue(1,3,`Widow Marn accepts ${amt} gold with quiet grace.`); }
          else msg(`Widow Marn thanks thee for ${amt} gold.`,"m-say"); } }},
+   "7":{name:"Watcher Flint",spr:"guard",peace:true,always:1,watch:1,patrol:[[2,2],[13,6],[8,13]],
+     greet:"A watcher in quarry-grey leans on a long spear.",
+     lines:{ job:"I watch the pit town. Rockfalls, tempers, and ale that walks off.",
+       deep:"Miners come up spooked from the third floor. I don't go down. My beat ends at the gate.",
+       law:"Thieves answer to me — coin, gaol, or worse. Pick coin." }},
    "6":mkInn("Innkeeper Ash","An innkeeper with quarry dust in his beard sets out a candle.",10,
      "Miners sleep here when the deep spooks them. Lately? Full house, every night."),
   }},
@@ -1412,11 +1475,11 @@ const TOWN_KEYS=["town0","town1","willowdale","goldport","stonevale","town2","va
   A("town0","Lyra",{s:[2,17],h:[2,17],amb:{phase:"social",text:"~ Lyra strikes up a reel; mugs thump the tables ~",notes:[523,659,784]}}); A("town0","Marla",{h:[14,16]});
   A("town1","Grimm",{s:[2,14],amb:{phase:"work",text:"CLANG. CLANG. Grimm's hammer rings off the anvil.",notes:[880,660]}}); A("town1","Wystan",{s:[3,14],h:[9,13]});
   A("town1","Fenn",{s:[5,14],h:[14,13]}); A("town1","Hilda",{h:[15,13]});
-  A("town1","Roke",{always:1});
+  A("town1","Roke",{always:1,watch:1,patrol:[[2,7],[16,7],[9,8]]});
   A("willowdale","Etta",{always:1}); A("willowdale","Col",{s:[3,15],h:[9,14]});
-  A("willowdale","Bess",{s:[5,15],h:[14,14]}); A("willowdale","Puck",{always:1,s:[2,15]});
+  A("willowdale","Bess",{s:[5,15],h:[14,14]}); A("willowdale","Puck",{always:1,watch:1,patrol:[[2,6],[9,2],[16,8]]});
   A("goldport","Hale",{s:[2,16],amb:{phase:"work",text:"Saw-rasp and tar-smell — Hale's yard hard at work.",notes:[440,415]}}); A("goldport","Ives",{s:[3,16],h:[9,15]});
-  A("goldport","Rena",{always:1,s:[5,16]}); A("goldport","Wick",{h:[14,15]});
+  A("goldport","Rena",{always:1,watch:1,patrol:[[2,6],[11,4],[9,13]]}); A("goldport","Wick",{h:[14,15]});
   A("town2","Meg",{always:1,amb:{phase:"social",text:"Meg slams down a tray of mugs to a roar of cheers.",notes:[392,392]}}); A("town2","Silas",{always:1,s:[7,2],h:[9,15]});
   A("town2","Rafe",{always:1,s:[7,3]}); A("town2","Scab",{always:1,s:[9,3],h:[10,15]});
   A("town2","Salt",{always:1,s:[9,2]});
@@ -2353,6 +2416,10 @@ function leaveLoc(){
       } else if(kind==="final"){
         msg("Thou abandonest Lord Lumen's halls to the Pirate King!","m-bad");
         virtue(2,-5);
+      } else if(kind==="law"){
+        P.thief={town:inLoc.key, until:turns+1000};
+        msg("Thou fleest the watch — an outlaw's name follows thee out.","m-bad");
+        virtue(3,-3);
       } else if(kind==="siege"){
         msg(`Thou abandonest ${LOCS[inLoc.key].name} to the reavers!`,"m-bad");
         virtue(2,-3);
@@ -2712,6 +2779,14 @@ function killMonster(m){
       msg("(The cult will find another shrine to hate...)","m-sys");
       return;
     }
+    if(inLoc.raid==="law"){
+      inLoc.raid=null;
+      P.thief={town:inLoc.key, until:turns+5000};
+      virtue(3,-15); virtue(0,-8); virtue(1,-8);
+      msg("The watch lies dead by thy hand. The streets stand empty in horror.","m-bad");
+      msg("(This town will remember for a very, very long time.)","m-sys");
+      return;
+    }
     if(inLoc.raid==="fire"){
       P.siege=null; P.lastSiege=turns;
       P.gold+=120;
@@ -3064,10 +3139,33 @@ function tick(){
         if(ch===","&&!npcAt(nx,ny)&&!(nx===P.x&&ny===P.y)&&!monsterAt(nx,ny)){ n.x=nx; n.y=ny; }
         continue;
       }
+      if(n.patrol) continue;   // the watch keeps its own hours
       const sp=phaseSpot(n);
       if(n.x===sp.x && n.y===sp.y) continue;
       const st=npcStep(n,sp);
       if(st && !npcAt(st.x,st.y) && !(st.x===P.x&&st.y===P.y) && !monsterAt(st.x,st.y)){ n.x=st.x; n.y=st.y; }
+    }
+    // the watch walks its beat, all hours
+    for(const n of inLoc.npcs){
+      if(!n.patrol || R()<.5) continue;
+      const tgt=n.patrol[n.pi||0];
+      if(n.x===tgt[0]&&n.y===tgt[1]){ n.pi=((n.pi||0)+1)%n.patrol.length; continue; }
+      const st=npcStep(n,{x:tgt[0],y:tgt[1]});
+      if(st && !npcAt(st.x,st.y) && !(st.x===P.x&&st.y===P.y) && !monsterAt(st.x,st.y)){ n.x=st.x; n.y=st.y; }
+    }
+    // curfew: the night watch challenges whoever walks the dark
+    if(dayPhase()==="sleep" && (P.curfewT===undefined || turns-P.curfewT>80)){
+      const g=inLoc.npcs.find(n=>n.watch);
+      if(g && Math.abs(g.x-P.x)+Math.abs(g.y-P.y)<=7){
+        P.curfewT=turns;
+        if(P.thief && P.thief.town===inLoc.key && turns<P.thief.until){
+          msg(`"HALT!" ${g.name} knows thy face — and marches thee to the gate.`,"m-bad");
+          leaveLoc(); return;
+        } else if(P.virtues[0]<15)
+          msg(`"HALT — what business at this hour?" ${g.name} searches thy pockets, finds naught, and grunts.`,"m-sys");
+        else
+          msg(`"Who goes?" ${g.name} squints, then waves thee on. "Honest folk abed were better."`,"m-sys");
+      }
     }
     // the sounds of honest work (and of taverns at song)
     if(turns%6===0 && R()<.4){
@@ -3417,6 +3515,7 @@ function cmdGet(){
             msg(w? `"THIEF!" ${w.name} saw everything — every honest door in town slams against thee!`
                  : '"THIEF!" A voice cries from somewhere — every honest door in town slams against thee!',"m-bad");
             sfx.die();
+            guardConfront(loot);
           } else msg(`Thou palmest ${loot} gold, unseen. Thy hands are quick; thy soul, poorer.`,"m-sys");
           renderStats();
         },

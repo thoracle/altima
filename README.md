@@ -39,8 +39,11 @@ thy progress.
   (shops keep hours; guards, healers, and pirates never rest); dogs,
   cats, and chickens wander the streets; innkeepers rent beds and
   pour rumors for a round of drinks; unwatched counters tempt thieves
-  (and towns remember a caught one — with witness-based odds: rob
-  empty shops at night or answer to whoever saw); Skullhaven runs a
+  (and towns remember a caught one — with witness-based odds, and a
+  watch that acts: pay the fine, bribe the constable, sleep it off
+  in the castle gaol, run for it, or draw steel on the law and live
+  with what follows; the night watch walks patrol beats and stops
+  whoever prowls after dark); Skullhaven runs a
   crooked dice den; the ruined town of Vainglory keeps its ghosts;
   every conversation shows the speaker's portrait; and the folk
   gossip about the world's actual news — sieges, desecrations, slain
