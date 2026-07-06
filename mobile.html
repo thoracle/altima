@@ -3877,7 +3877,7 @@ $("sndbtn").addEventListener("click",e=>{
 //---------------------------------------------------------------
 // Mobile chrome: joystick + one smart button (body.mobile only)
 //---------------------------------------------------------------
-const BUILD="m10";
+const BUILD="m11";
 { const bv=document.getElementById("bver"); if(bv) bv.textContent="build "+BUILD; }
 const IS_MOBILE = matchMedia("(pointer:coarse)").matches || innerWidth<720
                || /[?&]mobile=1/.test(location.search);   // dev preview override
@@ -3952,8 +3952,15 @@ function applyMobileClass(){
     joyEl.style.left=Math.max(8, st.left + st.width/2 - 62)+"px";
     joyEl.style.top =(lg.top + 62)+"px";
     joyEl.style.right="auto"; joyEl.style.bottom="auto";
+    $("screen").style.width=""; $("screen").style.height="";
   } else {
     for(const el of [joyEl,bar]){ el.style.left=""; el.style.right=""; el.style.top=""; el.style.bottom=""; el.style.width=""; }
+    // the canvas yields: it shrinks so HUD+log+bar+ring always fit the visible viewport
+    const vh=(window.visualViewport? visualViewport.height : innerHeight);
+    const fixedRows=$("mhud").offsetHeight + $("logbox").offsetHeight
+                  + ($("mbar").offsetHeight||92) + 176;   // ring + margins + borders/gaps
+    const size=Math.max(220, Math.min(innerWidth, Math.floor(vh-fixedRows)));
+    $("screen").style.width=size+"px"; $("screen").style.height=size+"px";
   }
 }
 window.addEventListener("resize", applyMobileClass);
