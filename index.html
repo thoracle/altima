@@ -91,7 +91,7 @@
   body.mobile #stats.open{right:0; box-shadow:-8px 0 24px #000c;}
   body.mobile #mbar{position:static; order:4; width:100%; gap:8px; padding:8px 10px calc(env(safe-area-inset-bottom,0px) + 10px);}
   body.mobile #mbar button{font-size:15px; padding:12px 10px;}
-  body.mobile #joy{left:14px; right:auto; bottom:calc(env(safe-area-inset-bottom,0px) + 92px);}
+
   body.mobile #screen{touch-action:none;}
 </style>
 </head>
@@ -1951,7 +1951,14 @@ function showPortrait(n){
   pctx.drawImage(SPRC[n.spr],0,0,64,64);
   document.getElementById("pnm").textContent=n.name;
   box.classList.remove("off");
-  document.getElementById("logbox").classList.add("talking");
+  if(document.body.classList.contains("mobile")){
+    const sr=$("screen").getBoundingClientRect();
+    box.style.position="fixed";
+    box.style.left=(sr.right-96)+"px"; box.style.top=(sr.bottom-104)+"px"; box.style.right="auto";
+  } else {
+    box.style.position=""; box.style.left=""; box.style.top=""; box.style.right="";
+    document.getElementById("logbox").classList.add("talking");
+  }
 }
 function hidePortrait(){ window.__talkN=null; document.getElementById("portrait").classList.add("off");
   document.getElementById("logbox").classList.remove("talking"); }
@@ -3941,9 +3948,17 @@ function applyMobileClass(){
     joyEl.style.right="auto"; joyEl.style.bottom="auto";
   } else {
     for(const el of [joyEl,bar]){ el.style.left=""; el.style.right=""; el.style.top=""; el.style.bottom=""; el.style.width=""; }
+    // phone: the ring lives in the dead space under the bar — never over log or chips
+    const br=bar.getBoundingClientRect();
+    const room=innerHeight-br.bottom;
+    joyEl.style.right="auto"; joyEl.style.bottom="auto";
+    joyEl.style.left="24px";
+    joyEl.style.top = (room>=150 ? br.bottom+10
+      : $("screen").getBoundingClientRect().bottom-134) + "px";   // cramped: over the canvas corner
   }
 }
 window.addEventListener("resize", applyMobileClass);
+window.addEventListener("load", applyMobileClass);
 applyMobileClass();
 if(mode==="title"){ $("joy").style.display="none"; $("mbar").style.display="none"; }
 if(IS_MOBILE || true){   // listeners are inert while body lacks .mobile
