@@ -2195,8 +2195,9 @@ const overlay=$("overlay");
 function showOverlay(title,body,go){
   $("obox").innerHTML=`<h1>${title}</h1><p style="text-align:center">${body}</p><div class="go">${go||"— PRESS ANY KEY —"}</div>`;
   overlay.classList.remove("off");
+  $("joy").style.display="none";
 }
-function hideOverlay(){ overlay.classList.add("off"); }
+function hideOverlay(){ overlay.classList.add("off"); $("joy").style.display=""; }
 
 //---------------------------------------------------------------
 // 12. Movement, world interaction
@@ -3937,6 +3938,7 @@ function applyMobileClass(){
 }
 window.addEventListener("resize", applyMobileClass);
 applyMobileClass();
+if(mode==="title") $("joy").style.display="none";
 if(IS_MOBILE || true){   // listeners are inert while body lacks .mobile
   // smart button + bar
   $("mact").addEventListener("click",()=>{ const[,k]=contextAction(); if(k) pressKey(k); });
@@ -3952,11 +3954,18 @@ if(IS_MOBILE || true){   // listeners are inert while body lacks .mobile
   let joyDir=null, joyTimer=null;
   const KEYS={up:"ArrowUp",down:"ArrowDown",left:"ArrowLeft",right:"ArrowRight"};
   const setKnob=(dx,dy)=>{ knob.style.left=(38+dx)+"px"; knob.style.top=(38+dy)+"px"; };
+  let joyDelay=null;
   const engage=(dir)=>{
     if(dir===joyDir) return;
     joyDir=dir;
     clearInterval(joyTimer); joyTimer=null;
-    if(dir){ pressKey(KEYS[dir]); joyTimer=setInterval(()=>{ if(joyDir) pressKey(KEYS[joyDir]); },170); }
+    clearTimeout(joyDelay); joyDelay=null;
+    if(dir){
+      pressKey(KEYS[dir]);   // step at once...
+      joyDelay=setTimeout(()=>{   // ...pause like key repeat...
+        if(joyDir) joyTimer=setInterval(()=>{ if(joyDir) pressKey(KEYS[joyDir]); },260);  // ...then walk
+      },350);
+    }
   };
   const track=(t)=>{
     const r=joy.getBoundingClientRect();
