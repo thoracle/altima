@@ -70,7 +70,7 @@
     border:1px solid var(--border); border-radius:8px; padding:9px 8px; cursor:pointer;}
   #mbar #mact{flex:1; color:var(--accent); border-color:var(--accent); font-weight:bold;}
   #mbar button:hover{border-color:var(--accent);}
-  #joy{display:block; position:fixed; right:100px; bottom:30px;
+  #joy{display:block; position:fixed; right:100px; bottom:30px; box-sizing:content-box;
     width:124px; height:124px; border-radius:50%; background:#ffffff10; border:2px solid #ffffff22;
     z-index:20; touch-action:none; cursor:grab;}
   #joyknob{position:absolute; left:38px; top:38px; width:48px; height:48px; border-radius:50%;
@@ -90,7 +90,8 @@
   body.mobile #stats{position:fixed; top:0; right:-280px; width:264px; height:100%; z-index:30;
     transition:right .2s; overflow-y:auto; padding-top:calc(env(safe-area-inset-top,0px) + 10px);}
   body.mobile #stats.open{right:0; box-shadow:-8px 0 24px #000c;}
-  body.mobile #mbar{position:static; order:4; width:100%; gap:8px; padding:8px 10px calc(env(safe-area-inset-bottom,0px) + 10px);}
+  body.mobile #joy{position:static; order:4; margin:10px auto 2px; flex:none;}
+  body.mobile #mbar{position:static; order:5; width:100%; gap:8px; padding:8px 10px calc(env(safe-area-inset-bottom,0px) + 10px);}
   body.mobile #mbar button{font-size:15px; padding:12px 10px;}
 
   body.mobile #screen{touch-action:none;}
@@ -134,6 +135,7 @@
       <div><kbd>B</kbd> board / cross ships &nbsp;<kbd>X</kbd> go ashore</div>
       <div><kbd>H</kbd> hole up & camp</div>
       <div><kbd>P</kbd> peer at world map</div>
+      <div id="bver" style="color:#555;">build —</div>
       <div><kbd>Z</kbd> ztats &nbsp;<kbd>?</kbd> help</div>
       <div><kbd>Shift+S</kbd> save &nbsp;<kbd>Space</kbd> pass</div>
     </div>
@@ -3875,6 +3877,8 @@ $("sndbtn").addEventListener("click",e=>{
 //---------------------------------------------------------------
 // Mobile chrome: joystick + one smart button (body.mobile only)
 //---------------------------------------------------------------
+const BUILD="m8";
+{ const bv=document.getElementById("bver"); if(bv) bv.textContent="build "+BUILD; }
 const IS_MOBILE = matchMedia("(pointer:coarse)").matches || innerWidth<720
                || /[?&]mobile=1/.test(location.search);   // dev preview override
 function pressKey(k){ document.dispatchEvent(new KeyboardEvent("keydown",{key:k})); }
@@ -3950,14 +3954,6 @@ function applyMobileClass(){
     joyEl.style.right="auto"; joyEl.style.bottom="auto";
   } else {
     for(const el of [joyEl,bar]){ el.style.left=""; el.style.right=""; el.style.top=""; el.style.bottom=""; el.style.width=""; }
-    // phone: the ring lives in the dead space under the bar — never over log or chips
-    const br=bar.getBoundingClientRect();
-    if(br.height===0) return;   // bar hidden (overlay up): position when it returns
-    const room=innerHeight-br.bottom;
-    joyEl.style.right="auto"; joyEl.style.bottom="auto";
-    joyEl.style.left="24px";
-    joyEl.style.top = (room>=150 ? br.bottom+10
-      : $("screen").getBoundingClientRect().bottom-134) + "px";   // cramped: over the canvas corner
   }
 }
 window.addEventListener("resize", applyMobileClass);
