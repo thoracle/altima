@@ -85,13 +85,13 @@
   body.mobile #mhud .hpfill{height:100%; background:var(--green);}
   body.mobile #mhud .hpfill.low{background:var(--red);}
   body.mobile #mhud .mtitle{color:var(--accent); font-size:11px; letter-spacing:1px;}
-  body.mobile #logbox{order:3; width:100%; max-width:none; height:132px; font-size:15px; border-left:none; border-right:none;}
+  body.mobile #logbox{order:3; width:100%; max-width:none; height:118px; font-size:15px; border-left:none; border-right:none;}
   body.mobile #tin{font-size:16px;}
   body.mobile #stats{position:fixed; top:0; right:-280px; width:264px; height:100%; z-index:30;
     transition:right .2s; overflow-y:auto; padding-top:calc(env(safe-area-inset-top,0px) + 10px);}
   body.mobile #stats.open{right:0; box-shadow:-8px 0 24px #000c;}
-  body.mobile #joy{position:relative; order:4; margin:10px auto 2px; flex:none;}
-  body.mobile #mbar{position:static; order:5; width:100%; gap:8px; padding:8px 10px calc(env(safe-area-inset-bottom,0px) + 10px);}
+  body.mobile #joy{position:relative; right:auto; bottom:auto; order:5; margin:8px auto 6px; flex:none;}
+  body.mobile #mbar{position:static; order:4; width:100%; gap:8px; padding:8px 10px 8px;}
   body.mobile #mbar button{font-size:15px; padding:12px 10px;}
 
   body.mobile #screen{touch-action:none;}
@@ -3877,7 +3877,7 @@ $("sndbtn").addEventListener("click",e=>{
 //---------------------------------------------------------------
 // Mobile chrome: joystick + one smart button (body.mobile only)
 //---------------------------------------------------------------
-const BUILD="m9";
+const BUILD="m10";
 { const bv=document.getElementById("bver"); if(bv) bv.textContent="build "+BUILD; }
 const IS_MOBILE = matchMedia("(pointer:coarse)").matches || innerWidth<720
                || /[?&]mobile=1/.test(location.search);   // dev preview override
