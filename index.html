@@ -2208,7 +2208,8 @@ function showOverlay(title,body,go){
   overlay.classList.remove("off");
   $("joy").style.display="none"; $("mbar").style.display="none";
 }
-function hideOverlay(){ overlay.classList.add("off"); $("joy").style.display=""; $("mbar").style.display=""; }
+function hideOverlay(){ overlay.classList.add("off"); $("joy").style.display=""; $("mbar").style.display="";
+  if(typeof applyMobileClass==="function") applyMobileClass(); }
 
 //---------------------------------------------------------------
 // 12. Movement, world interaction
@@ -3951,6 +3952,7 @@ function applyMobileClass(){
     for(const el of [joyEl,bar]){ el.style.left=""; el.style.right=""; el.style.top=""; el.style.bottom=""; el.style.width=""; }
     // phone: the ring lives in the dead space under the bar — never over log or chips
     const br=bar.getBoundingClientRect();
+    if(br.height===0) return;   // bar hidden (overlay up): position when it returns
     const room=innerHeight-br.bottom;
     joyEl.style.right="auto"; joyEl.style.bottom="auto";
     joyEl.style.left="24px";
