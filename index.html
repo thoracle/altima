@@ -3928,11 +3928,12 @@ function applyMobileClass(){
   document.body.classList.toggle("mobile", on);
   if(on && typeof updateMobileUI==="function") updateMobileUI();
   const joyEl=$("joy");
-  if(!on){   // desktop: park the ring under the virtues column
-    const r=$("stats").getBoundingClientRect();
-    joyEl.style.left=Math.max(8, r.left + r.width/2 - 62)+"px";
-    joyEl.style.right="auto";
-  } else { joyEl.style.left=""; joyEl.style.right=""; }
+  if(!on){   // desktop: inside the stats panel's empty lower half, level with the log
+    const st=$("stats").getBoundingClientRect(), lg=$("logbox").getBoundingClientRect();
+    joyEl.style.left=Math.max(8, st.left + st.width/2 - 62)+"px";
+    joyEl.style.top =Math.max(8, lg.top + lg.height/2 - 62)+"px";
+    joyEl.style.right="auto"; joyEl.style.bottom="auto";
+  } else { joyEl.style.left=""; joyEl.style.right=""; joyEl.style.top=""; joyEl.style.bottom=""; }
 }
 window.addEventListener("resize", applyMobileClass);
 applyMobileClass();
