@@ -5,7 +5,7 @@
 <meta http-equiv="Content-Security-Policy"
       content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:">
 <title>ALTIMA</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <style>
   :root{
     --bg:#000; --fg:#eeeef2; --dim:#b0b6c8; --accent:#ffd24a; --blue:#8fbaff;
@@ -86,6 +86,7 @@
   body.mobile #mhud .hpfill.low{background:var(--red);}
   body.mobile #mhud .mtitle{color:var(--accent); font-size:11px; letter-spacing:1px;}
   body.mobile #logbox{order:3; width:100%; max-width:none; height:132px; font-size:15px; border-left:none; border-right:none;}
+  body.mobile #tin{font-size:16px;}
   body.mobile #stats{position:fixed; top:0; right:-280px; width:264px; height:100%; z-index:30;
     transition:right .2s; overflow-y:auto; padding-top:calc(env(safe-area-inset-top,0px) + 10px);}
   body.mobile #stats.open{right:0; box-shadow:-8px 0 24px #000c;}
@@ -3959,6 +3960,7 @@ function applyMobileClass(){
 }
 window.addEventListener("resize", applyMobileClass);
 window.addEventListener("load", applyMobileClass);
+if(window.visualViewport) visualViewport.addEventListener("resize", applyMobileClass);
 applyMobileClass();
 if(mode==="title"){ $("joy").style.display="none"; $("mbar").style.display="none"; }
 if(IS_MOBILE || true){   // listeners are inert while body lacks .mobile
