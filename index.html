@@ -64,7 +64,12 @@
     font:inherit; font-size:15px; padding:2px 8px; cursor:pointer; border-radius:3px;}
   #sndbtn:hover{border-color:var(--accent);}
   /* —— mobile chrome (body.mobile) —— */
-  #mhud,#mbar,#joy{display:none;}
+  #mhud,#mbar{display:none;}
+  #joy{display:block; position:fixed; right:100px; bottom:30px;
+    width:124px; height:124px; border-radius:50%; background:#ffffff10; border:2px solid #ffffff22;
+    z-index:20; touch-action:none; cursor:grab;}
+  #joyknob{position:absolute; left:38px; top:38px; width:48px; height:48px; border-radius:50%;
+    background:#ffffff2e; border:2px solid #ffffff55; pointer-events:none;}
   body.mobile #frame{display:flex; flex-direction:column; gap:4px; padding:0; width:100vw; max-width:480px; margin:0 auto;}
   body.mobile #screen{order:2; width:100%; aspect-ratio:1/1; height:auto; margin:0 auto; border-left:none; border-right:none;}
   body.mobile #sndbtn{top:calc(env(safe-area-inset-top,0px) + 44px); right:8px;}
@@ -83,11 +88,7 @@
   body.mobile #mbar button{font:inherit; font-size:15px; background:#10101e; color:var(--fg);
     border:1px solid var(--border); border-radius:8px; padding:12px 10px;}
   body.mobile #mbar #mact{flex:1; color:var(--accent); border-color:var(--accent); font-weight:bold;}
-  body.mobile #joy{display:block; position:fixed; left:14px; bottom:calc(env(safe-area-inset-bottom,0px) + 92px);
-    width:124px; height:124px; border-radius:50%; background:#ffffff10; border:2px solid #ffffff22;
-    z-index:20; touch-action:none;}
-  body.mobile #joyknob{position:absolute; left:38px; top:38px; width:48px; height:48px; border-radius:50%;
-    background:#ffffff2e; border:2px solid #ffffff55; pointer-events:none;}
+  body.mobile #joy{left:14px; right:auto; bottom:calc(env(safe-area-inset-bottom,0px) + 92px);}
   body.mobile #screen{touch-action:none;}
 </style>
 </head>
@@ -3926,6 +3927,12 @@ function applyMobileClass(){
           || /[?&]mobile=1/.test(location.search);
   document.body.classList.toggle("mobile", on);
   if(on && typeof updateMobileUI==="function") updateMobileUI();
+  const joyEl=$("joy");
+  if(!on){   // desktop: park the ring under the virtues column
+    const r=$("stats").getBoundingClientRect();
+    joyEl.style.left=Math.max(8, r.left + r.width/2 - 62)+"px";
+    joyEl.style.right="auto";
+  } else { joyEl.style.left=""; joyEl.style.right=""; }
 }
 window.addEventListener("resize", applyMobileClass);
 applyMobileClass();
@@ -3959,11 +3966,13 @@ if(IS_MOBILE || true){   // listeners are inert while body lacks .mobile
     setKnob(kx,ky);
     engage(Math.abs(dx)>Math.abs(dy) ? (dx>0?"right":"left") : (dy>0?"down":"up"));
   };
-  joy.addEventListener("touchstart",e=>{ e.preventDefault(); ensureMusic(); track(e.touches[0]); },{passive:false});
-  joy.addEventListener("touchmove", e=>{ e.preventDefault(); track(e.touches[0]); },{passive:false});
-  const release=e=>{ e.preventDefault(); engage(null); setKnob(0,0); };
-  joy.addEventListener("touchend",release,{passive:false});
-  joy.addEventListener("touchcancel",release,{passive:false});
+  let joyActive=false;
+  joy.addEventListener("pointerdown",e=>{ e.preventDefault(); ensureMusic();
+    joyActive=true; joy.setPointerCapture(e.pointerId); track(e); },{passive:false});
+  joy.addEventListener("pointermove",e=>{ if(joyActive){ e.preventDefault(); track(e); } },{passive:false});
+  const release=e=>{ joyActive=false; engage(null); setKnob(0,0); };
+  joy.addEventListener("pointerup",release);
+  joy.addEventListener("pointercancel",release);
   // audio + autosave lifecycle
   document.addEventListener("touchstart",()=>ensureMusic(),{once:true});
   document.addEventListener("visibilitychange",()=>{
