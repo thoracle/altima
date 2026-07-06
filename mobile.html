@@ -90,7 +90,7 @@
   body.mobile #stats{position:fixed; top:0; right:-280px; width:264px; height:100%; z-index:30;
     transition:right .2s; overflow-y:auto; padding-top:calc(env(safe-area-inset-top,0px) + 10px);}
   body.mobile #stats.open{right:0; box-shadow:-8px 0 24px #000c;}
-  body.mobile #joy{position:static; order:4; margin:10px auto 2px; flex:none;}
+  body.mobile #joy{position:relative; order:4; margin:10px auto 2px; flex:none;}
   body.mobile #mbar{position:static; order:5; width:100%; gap:8px; padding:8px 10px calc(env(safe-area-inset-bottom,0px) + 10px);}
   body.mobile #mbar button{font-size:15px; padding:12px 10px;}
 
@@ -3877,7 +3877,7 @@ $("sndbtn").addEventListener("click",e=>{
 //---------------------------------------------------------------
 // Mobile chrome: joystick + one smart button (body.mobile only)
 //---------------------------------------------------------------
-const BUILD="m8";
+const BUILD="m9";
 { const bv=document.getElementById("bver"); if(bv) bv.textContent="build "+BUILD; }
 const IS_MOBILE = matchMedia("(pointer:coarse)").matches || innerWidth<720
                || /[?&]mobile=1/.test(location.search);   // dev preview override
