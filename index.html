@@ -3921,8 +3921,15 @@ function updateMobileUI(){
       `<span>⛁${P.gold} 🍞${P.food}${P.poison?" ☠":""}</span>`;
   }
 }
-if(IS_MOBILE){
-  document.body.classList.add("mobile");
+function applyMobileClass(){
+  const on = matchMedia("(pointer:coarse)").matches || innerWidth<720
+          || /[?&]mobile=1/.test(location.search);
+  document.body.classList.toggle("mobile", on);
+  if(on && typeof updateMobileUI==="function") updateMobileUI();
+}
+window.addEventListener("resize", applyMobileClass);
+applyMobileClass();
+if(IS_MOBILE || true){   // listeners are inert while body lacks .mobile
   // smart button + bar
   $("mact").addEventListener("click",()=>{ const[,k]=contextAction(); if(k) pressKey(k); });
   $("mmap").addEventListener("click",()=>pressKey("p"));
