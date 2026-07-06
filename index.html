@@ -1111,13 +1111,13 @@ town2:{
        capture:"Sink a pirate ship gentle-like and her crew gives up — then she's YOURS to sail." }},
    "5":{name:"Old Salt",spr:"guard",peace:true,
      greet:"An ancient shipwright chews a nail thoughtfully.",
-     lines:{ job:"Hulls broke and hulls mended. Say REPAIR — thirty gold patches thy fleet.",
+     lines:{ job:()=>msg(`"Hulls broke and hulls mended. Say REPAIR — thirty gold patches thy ${ships.length>1?"fleet":"ship"}."`,"m-say"),
        repair:()=>{
          if(!ships.length) return msg("\"Thou hast no ship, lubber.\"","m-sys");
          if(ships.every(s=>s.hull>=s.maxhull)) return msg("\"Thy hull is sound as stone already.\"","m-sys");
          if(P.gold<30) return msg("\"No coin, no caulk.\"","m-sys");
          P.gold-=30; ships.forEach(s=>s.hull=s.maxhull);
-         msg("Old Salt patches thy fleet good as new.","m-good"); sfx.gold();
+         msg(`Old Salt patches thy ${ships.length>1?"fleet":"ship"} good as new.`,"m-good"); sfx.gold();
        },
        whirl:"Hit the whirlpool once. Woke up half the sea away with me hat gone.",
        hull:"A moored ship mends herself slow. Or pay me and sail NOW." }},
@@ -1223,13 +1223,13 @@ goldport:{
   npcs:{
    "1":{name:"Shipwright Hale",spr:"guard",peace:true,
      greet:"Sawdust and tar — a shipwright looks up from her bench.",
-     lines:{ job:"Hulls mended proper. Say REPAIR — thirty gold patches thy whole fleet.",
+     lines:{ job:()=>msg(`"Hulls mended proper. Say REPAIR — thirty gold patches thy ${ships.length>1?"whole fleet":"ship"}."`,"m-say"),
        repair:()=>{
          if(!ships.length) return msg('"Buy a ship first, landwalker."',"m-sys");
          if(ships.every(s=>s.hull>=s.maxhull)) return msg('"Sound as the day she was laid. Off with thee."',"m-sys");
          if(P.gold<30) return msg('"Thirty gold. Wood isn\'t free."',"m-sys");
          P.gold-=30; ships.forEach(s=>s.hull=s.maxhull);
-         msg("Hale patches thy fleet good as new.","m-good"); sfx.gold();
+         msg(`Hale patches thy ${ships.length>1?"fleet":"ship"} good as new.`,"m-good"); sfx.gold();
        },
        ghost:"The pale ship? Seen her twice. Her timbers take half the blow they should. Unnatural. Beautiful work, though." }},
    "2":{name:"Trader Ives",spr:"merchant",peace:true,
